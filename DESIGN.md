@@ -118,6 +118,13 @@ owner 在 iPhone 的 Claude App 裡打字的截圖顯示兩件事，**成因是�
 
 ⇒ **字型只有 Noto Sans Siddham**（SIL OFL），CSS 裡**一個 `local()` 都沒有**（第 ⑯ 條）。
 
+⚠️ **「在 iPhone 上裝 Siddam／Mojikyo 就好」行不通**〔2026-10-08 查證，owner 決定維持只用 Noto〕：
+iOS 可以用描述檔或字型 App 安裝字型，但那是給原生 App 用的；**WebKit（Safari、Claude App 內嵌的網頁、iOS 上所有瀏覽器）
+為了防字型指紋，只讓網頁讀到系統內建字型**，使用者自己裝的 `local()` 一律找不到（WebKit 開發者 2022 年在 webkit-dev 的說法、
+WebKit bug 200627）。⚠️ 來源是 2016–2022 年的，未在現行 iOS 上實測。
+網頁要畫出那兩套造字只剩「由伺服器送字型檔」一條路，而那兩支沒有再散布的授權——public repo 與 Artifacts 都不行，
+只有比照 `siddham-fonts` 的孵化器私人版（不建 repo、不發佈）在授權上站得住，**owner 選擇不做**。
+
 ## 6. 記號列（體文 ⇄ 接續）
 
 - 手機鍵盤上 `;` `.` `,` `~` 要切到符號頁才打得到，而這套記法幾乎每個字都要用 ⇒ 一鍵插入。
