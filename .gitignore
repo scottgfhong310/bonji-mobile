@@ -1,0 +1,33 @@
+# 依賴
+node_modules/
+
+# 系統檔
+.DS_Store
+Thumbs.db
+
+# 編輯器 / 工具
+.vscode/
+.claude/
+
+# 日誌
+*.log
+
+# Artifacts 版的建置產物（python3 artifact/build.py）
+artifact/dist/
+
+# ── 字型：deny-by-default（預設全擋，再逐支放行）──────────────────
+# 本 repo 是 **public**；字型是二進位著作物，收進來就是對全世界再散布。
+# 理由與兩種漏法代價不對稱的說明見 bonji 的 .gitignore（同一套規則）：
+# **擋錯了會被發現，放錯了不會**——所以預設要擋。
+# ⚠️ 本 app 只用 Noto Sans Siddham：手機上沒有 Mojikyo M119／Siddam 可讀，
+#    bonji 讀本機安裝版的那兩支在這裡**連 local() 都沒有**。
+*.ttf
+*.otf
+*.ttc
+*.woff
+*.woff2
+*.eot
+
+# 放行清單：只放授權明確允許再散布的。
+# Noto Sans Siddham：name13 ＝ SIL OFL 1.1，並附 fonts/OFL.txt。
+!/public/apps/bonji-mobile/fonts/NotoSansSiddham-Regular.woff2

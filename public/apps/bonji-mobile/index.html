@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-Hant" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <!-- interactive-widget=resizes-content：Android Chrome 鍵盤彈出時連 layout viewport 一起縮
+       （iOS Safari 不認這個值，那邊靠 visualViewport，見 bonji-mobile.js 的 fitShell）。 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <title data-i18n-doctitle="title.page">Bonji Mobile — Siddhaṁ</title>
+  <!-- 防主題閃爍：render 前先讀 localStorage 設好 data-theme + light/dark-mode class
+       （class 是給共用 materialize-dark.css 用的；無 light-mode 時它會跟隨系統深色偏好） -->
+  <script>try { var t = localStorage.getItem('bonji-mobile-theme') || 'dark'; var r = document.documentElement; r.dataset.theme = t; r.classList.add(t === 'light' ? 'light-mode' : 'dark-mode'); } catch (e) {}</script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />
+  <link rel="stylesheet" href="./materialize-dark.css" />
+  <link rel="stylesheet" href="./bonji-mobile.css" />
+  <link rel="stylesheet" href="./side-tool.css" />
+</head>
+<body class="is-empty">
+  <!-- 外殼：高度＝可見範圍（鍵盤彈出後扣掉鍵盤），整頁不捲；只有輸出區自己捲。
+       由上而下：頁首（鍵盤開著時收起）→ 輸出 → 記號列 → 輸入。輸入貼底＝貼著鍵盤。 -->
+  <div id="shell" class="shell">
+    <header class="topbar">
+      <h1 class="topbar-title" data-i18n="app.title">悉曇梵字・手機版</h1>
+      <a href="#!" id="open-options" class="topbar-btn" data-i18n-title="tool.options" title="選項">
+        <i class="material-icons">tune</i>
+      </a>
+      <span id="tools-toggle" class="topbar-btn tools-toggle" role="button" tabindex="0"
+        data-i18n-title="tool.toggleTools" title="工具列開關">
+        <i class="material-icons">more_vert</i>
+      </span>
+    </header>
+
+    <section class="out-pane" id="out-pane">
+      <div class="out-block out-block-siddham">
+        <div class="out-head">
+          <span class="out-label" data-i18n="out.siddham">悉曇 Siddhaṁ</span>
+          <a href="#!" class="out-copy" data-copy="siddham" data-i18n-title="tool.copy" title="複製">
+            <i class="material-icons">content_copy</i>
+          </a>
+        </div>
+        <div id="out-siddham" class="out-value siddham-text" aria-live="polite"></div>
+      </div>
+      <div class="out-block out-block-latin">
+        <div class="out-head">
+          <span class="out-label" data-i18n="out.latin">拉丁轉寫</span>
+          <a href="#!" class="out-copy" data-copy="latin" data-i18n-title="tool.copy" title="複製">
+            <i class="material-icons">content_copy</i>
+          </a>
+        </div>
+        <div id="out-latin" class="out-value latin-text"></div>
+      </div>
+
+      <!-- 空狀態：輸入是空的時候取代上面兩塊 -->
+      <div class="empty-state">
+        <p class="hint" data-i18n-html="input.hint">記法：<code>;m</code>＝ṁ、<code>.h</code>＝ḥ、<code>~m</code>＝m̐、長母音 <code>aa</code>＝ā。</p>
+        <div class="examples">
+          <span class="examples-label" data-i18n="examples.label">範例：</span>
+          <a href="#!" class="chip ex" data-ex="o;m">o;m</a>
+          <a href="#!" class="chip ex" data-ex="siddha;m">siddha;m</a>
+          <a href="#!" class="chip ex" data-ex="hrii.h">hrii.h</a>
+          <a href="#!" class="chip ex" data-ex="na ma.h">na ma.h</a>
+          <a href="#!" class="chip ex" data-ex="huu~m">huu~m</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 記號列：鍵由 bonji-mobile.js 依輸入法產生（BonjiMobileLib.keysFor）。
+         ⚠️ 按鍵不可以讓輸入框失焦——失焦鍵盤就收起來了（見 bindKeybar）。 -->
+    <div id="keybar" class="keybar" role="toolbar" data-i18n-title="keybar.label" title="記號"></div>
+
+    <div class="in-bar">
+      <textarea id="bm-input" class="bm-input mono" rows="1"
+        autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false"
+        data-i18n-placeholder="input.placeholder" placeholder="例如：siddha;m"></textarea>
+      <a href="#!" id="clear-input" class="in-clear" data-i18n-title="tool.clear" title="清除輸入">
+        <i class="material-icons">clear</i>
+      </a>
+    </div>
+  </div>
+
+  <!-- 右側浮動工具列（家族共用 side-tool.css，§5.5）：只有主題與語言兩顆 chrome。
+       手機上預設收起（右上角 ⋮ 叫回來），否則它會壓在輸出區的右緣。 -->
+  <div class="side-tools">
+    <a id="setting-mode" class="side-tool" href="#!" data-i18n-title="tool.mode" title="切換 light / dark">
+      <i class="material-icons">dark_mode</i>
+    </a>
+    <a id="setting-lang" class="side-tool" href="#!" data-i18n-title="tool.lang" title="語言">
+      <i class="material-icons">translate</i>
+    </a>
+  </div>
+
+  <!-- 選項：Materialize bottom-sheet。select 用系統原生（browser-default）——
+       Materialize 自製下拉在觸控裝置上會選到下一列（家族 coffee-deposit 實測）。 -->
+  <div id="options-modal" class="modal bottom-sheet options-sheet">
+    <div class="modal-content">
+      <h2 class="sheet-title" data-i18n="opt.title">選項</h2>
+      <label class="opt-field">
+        <span class="opt-label" data-i18n="opt.inputMethod">輸入法</span>
+        <select id="opt-input-method" class="browser-default">
+          <option value="ISO15919">ISO 15919</option>
+          <option value="KH">Kyoto-Harvard</option>
+        </select>
+      </label>
+      <label class="opt-field">
+        <span class="opt-label" data-i18n="opt.translit">拉丁轉寫</span>
+        <select id="opt-translit" class="browser-default">
+          <option value="ISO15919">ISO 15919</option>
+          <option value="IAST">IAST</option>
+        </select>
+      </label>
+      <div class="switch opt-switch">
+        <label>
+          <input type="checkbox" id="opt-ignore-spaces" />
+          <span class="lever"></span>
+          <span data-i18n="opt.ignoreSpaces">忽略空格與連字號</span>
+        </label>
+      </div>
+      <p class="hint" data-i18n-html="input.hint"></p>
+      <p class="credit" data-i18n-html="footer.credit"></p>
+    </div>
+    <div class="modal-footer">
+      <a href="#!" class="modal-close btn-flat" data-i18n="opt.done">完成</a>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+  <script src="./i18n.js"></script>
+  <script src="./locales/zh-Hant.js"></script>
+  <script src="./locales/en.js"></script>
+  <script src="./locales/ja.js"></script>
+  <script src="./side-tool.js"></script>
+  <script src="./bonji-mobile-lib.js"></script>
+  <!-- 控制器是 ESM：它 import siddham-converter.js（引擎是純 ESM，同 bonji 的偏離理由） -->
+  <script type="module" src="./bonji-mobile.js"></script>
+</body>
+</html>

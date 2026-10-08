@@ -1,0 +1,422 @@
+/* bonji-mobile — 頁面樣式：主題 token（light/dark）＋ 手機優先的單畫面版型。
+ * Materialize 元件的深色由共用 materialize-dark.css 處理；側鍵樣式見 side-tool.css。
+ *
+ * 版型的一條原則：**整頁不捲，只有輸出區自己捲。** 外殼 .shell 的 top／height 由
+ * bonji-mobile.js 依 visualViewport 寫進 --shell-top／--shell-h（鍵盤彈出後就是扣掉鍵盤的那一塊），
+ * 輸入貼底 ⇒ 永遠貼著鍵盤，輸出吃掉剩下的高度。
+ */
+
+/* ===== 悉曇字型（隨 app 內嵌，SIL OFL；CDN 無可靠來源，否則輸出是缺字方塊） ===== */
+@font-face {
+  font-family: 'Noto Sans Siddham';
+  src: url('./fonts/NotoSansSiddham-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ===== 主題變數（light / dark 由 <html data-theme> 切換；值同 bonji） ===== */
+:root,
+[data-theme="dark"] {
+  --bg: #0f1115;
+  --surface: #161a22;
+  --surface-2: #1b2030;
+  --text: #e8eaf0;
+  --muted: #a8b0c0;
+  --border: rgba(255, 255, 255, 0.12);
+  --accent: #90caf9;
+  --card-bg: #0f1115;
+  --tool-bg: #1b2030;
+  --tool-fg: #e8eaf0;
+  --overlay: rgba(10, 14, 22, 0.84);
+  --drop-border: #3a4252;
+  --danger: #ff6e6e;
+}
+
+[data-theme="light"] {
+  --bg: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --text: #1f2328;
+  --muted: #57606a;
+  --border: rgba(0, 0, 0, 0.12);
+  --accent: #0969da;
+  --card-bg: #ffffff;
+  --tool-bg: #ffffff;
+  --tool-fg: #1f2328;
+  --overlay: rgba(240, 243, 247, 0.86);
+  --drop-border: #c4ccd6;
+  --danger: #d93636;
+}
+
+:root {
+  /* 會拿到焦點的控制項字級。⚠️ 不可小於 16px，否則 iOS 聚焦時自動放大整頁；
+   * 取 20px 是因為 Artifacts 版會被宿主等比縮小，16px 落地後小於 16 照樣放大
+   * （家族 memory artifact-runtime-gotchas 第 3 條，20px 實測可行）。 */
+  --ctl-font: 20px;
+  --siddham-font: 'Noto Sans Siddham', sans-serif;
+  --mono-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;             /* 整頁不捲：捲的只有 .out-value */
+  overscroll-behavior: none;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  transition: background .2s ease, color .2s ease;
+}
+
+.mono { font-family: var(--mono-font); }
+
+/* ===== 外殼 ===== */
+.shell {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--shell-top, 0px);
+  height: var(--shell-h, 100dvh);
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+}
+
+/* 鍵盤開著時：底部安全區由鍵盤蓋掉了、頁首收起把高度讓給輸出 */
+body.kb-open .shell { padding-bottom: 0; }
+body.kb-open .topbar { display: none; }
+
+/* ===== 頁首 ===== */
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 48px;
+  padding: env(safe-area-inset-top, 0px) 4px 0 16px;
+}
+
+.topbar-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 48px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;                  /* 觸控目標 */
+  height: 44px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 8px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.topbar-btn:hover { color: var(--accent); background: var(--surface-2); }
+.topbar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+.topbar-btn.active { color: var(--accent); }
+
+/* ===== 輸出區 ===== */
+.out-pane {
+  flex: 1 1 auto;
+  min-height: 0;                /* 讓子項可以縮到比內容小（否則 flex 子項的下限是內容高） */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 12px 8px;
+}
+
+.out-block {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 4px 12px 8px;
+  box-sizing: border-box;
+}
+/* 比例寫進 flex-basis（不寫成 3:2 的 grow）：basis 0 時內距會把小的那塊墊到地板，比例就不是那兩個數字 */
+.out-block-siddham { flex: 1 1 60%; }
+.out-block-latin { flex: 1 1 40%; }
+
+.out-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+}
+
+.out-label {
+  color: var(--muted);
+  font-size: .8rem;
+}
+
+.out-value {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.siddham-text {
+  font-family: var(--siddham-font);
+  font-size: 2rem;
+  line-height: 1.7;
+}
+
+.latin-text {
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.out-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 32px;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color .15s, background .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.out-copy:hover { color: var(--accent); background: var(--surface-2); }
+.out-copy i { font-size: 18px; }
+
+/* 空狀態：輸入是空的時候取代兩塊輸出 */
+.empty-state { display: none; padding: 8px 4px; }
+body.is-empty .out-block { display: none; }
+body.is-empty .empty-state { display: block; }
+
+.hint {
+  font-size: .9rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+.hint code,
+code {
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--mono-font);
+  font-size: .85em;
+}
+
+.examples {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.examples-label { color: var(--muted); font-size: .85rem; }
+.examples .chip { margin: 0; font-family: var(--mono-font); cursor: pointer; }
+
+/* ===== 記號列 ===== */
+.keybar {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 8px;
+  scrollbar-width: none;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.keybar::-webkit-scrollbar { display: none; }
+
+/* 裸 <button>：Materialize 會對它套 teal 的互動底（DESIGN_GUIDELINES §5.1 gotcha）⇒ 三態都自己給 */
+.keybar .key {
+  flex: none;
+  min-width: 46px;
+  height: 46px;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  touch-action: manipulation;   /* 不等雙擊縮放的判定，連按才跟得上 */
+  -webkit-tap-highlight-color: transparent;
+}
+.keybar .key:hover,
+.keybar .key:focus { background: var(--surface-2); color: var(--text); outline: none; }
+.keybar .key:active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.keybar .key:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.key-glyph {
+  font-family: var(--siddham-font);
+  font-size: 1.05rem;
+  line-height: 1.1;
+  color: inherit;               /* 裸 span 會被 materialize-dark 的 --mz-text 蓋掉（§5.1 gotcha） */
+}
+.key-ins {
+  font-family: var(--mono-font);
+  font-size: .85rem;
+  line-height: 1.1;
+  color: inherit;
+}
+.key-punct .key-ins { font-size: 1.1rem; }
+
+/* ===== 輸入 ===== */
+.in-bar {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 2px 8px 8px;
+  background: var(--surface);
+}
+
+/* 不用 .materialize-textarea：它靠 keyup 長高且 overflow:hidden，滑鼠／長按貼上的內容會被裁掉
+ * （家族 memory materialize-textarea-autoresize-keyup）。高度由 bonji-mobile.js 的 autosize 給。 */
+.in-bar .bm-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: border-box;
+  height: 46px;
+  min-height: 46px;
+  max-height: var(--input-max, 30vh);
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--mono-font);
+  font-size: var(--ctl-font);
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  resize: none;
+  overflow-y: auto;
+}
+.in-bar .bm-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+  outline: none;
+}
+
+.in-clear {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 46px;
+  color: var(--muted);
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 0,2,1：贏過 Materialize 對 a 的預設色 */
+.in-bar .in-clear:hover { color: var(--danger); background: var(--surface-2); }
+
+/* ===== 選項（bottom-sheet） ===== */
+.options-sheet .sheet-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+.opt-field {
+  display: block;
+  margin: 0 0 14px;
+}
+.opt-label {
+  display: block;
+  color: var(--muted);
+  font-size: .85rem;
+  margin-bottom: 4px;
+}
+
+/* 原生 select：外觀拉到與 Materialize 欄位一致（形制照 coffee-deposit）。
+ * ⚠️ 0,2,1 贏過 materialize-dark 的 select.browser-default（0,1,1）。 */
+.options-sheet select.browser-default {
+  display: block;
+  width: 100%;
+  height: 48px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0 28px 0 4px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background-color: transparent;
+  color: var(--text);
+  font-size: var(--ctl-font);
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23a8b0c0' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+.options-sheet select.browser-default:focus {
+  border-bottom-color: var(--accent);
+  box-shadow: 0 1px 0 0 var(--accent);
+  outline: none;
+}
+.options-sheet select.browser-default option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.opt-switch { margin: 6px 0 18px; }
+.options-sheet .credit { font-size: .8rem; color: var(--muted); margin: 0; }
+
+/* ===== toast 一律在上方 =====
+ * Materialize 在窄螢幕把 toast 放底部；iOS 上那是 layout viewport 的底部，**正好在鍵盤後面**，
+ * 而且會蓋住輸入列。改貼外殼上緣（--shell-top 由 fitShell 寫入）。
+ * 同為 #toast-container（1,0,0），本檔較晚載入 ⇒ 蓋過 Materialize 那三個 media query。 */
+#toast-container {
+  top: calc(var(--shell-top, 0px) + 8px);
+  bottom: auto;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  min-width: 0;
+  max-width: 92%;
+}
+
+/* ===== 側鍵：手機上預設收起，右上角 ⋮ 叫回來 =====
+ * ⚠️ 「只在手機」只由這裡的 600px 決定（Materialize small 斷點，同 bonji DESIGN §10）：
+ *    ⋮ 在寬螢幕上不出現，body.tools-hidden 也只在這個 media query 裡生效。JS 不判斷寬度。 */
+.tools-toggle { display: none; }
+
+@media (max-width: 600px) {
+  .tools-toggle { display: flex; }
+  body.tools-hidden .side-tools { display: none; }
+}
+
+/* 寬螢幕：外殼讓出側鍵那一條（右 12px ＋ 46px 鍵 ＋ 12px），否則 601–700px 之間兩者重疊 */
+@media (min-width: 601px) {
+  .shell { right: 70px; }
+}
