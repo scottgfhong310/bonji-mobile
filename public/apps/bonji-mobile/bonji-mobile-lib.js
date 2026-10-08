@@ -4,8 +4,11 @@
  * 悉曇轉換本身不在這裡：唯一的轉換介面是 ./siddham-converter.js（ESM 防腐層，
  * bonji 的 byte-identical 複製件）。本檔放的是**這支 app 自己的、離開畫面仍成立**的邏輯：
  *
- *   KEYSET_IDS                 記號列的四組（切換順序）：'vowel'（母音）→ 'variant'（異體字）→ 'bindu'（體文）→ 'ligature'（接續）
+ *   KEYSET_IDS                 記號列的六組（切換順序）：'vowel'（母音）→ 'variant'（異體字）→ 'bindu'（體文）
+ *                              → 'ligature_u'（上接續）→ 'ligature_l'（下接續）→ 'ligature'（接續）
  *   keysFromCatalog(cat, id)   → [{ ins, glyph }] —— 由 bonji 的 data/catalog.json 推出該組的鍵
+ *   keysFromElements(el, id)   → [{ ins, cbeta }] —— 由 data/element-catalog.json 的 Cbeta 群推出（上／下接續）
+ *   keysFor(cat, el, id)       → 依組別分派到上面兩支
  *   normalizeKeyset(id)        → 白名單版本（從 localStorage 讀回來的不可信）
  *   insertAt(value, s, e, t)   → { value, caret } —— 把 t 插在選取範圍 [s, e) 上
  *   shellBox(m)                → { top, height } —— 外殼該貼齊的可見範圍（鍵盤彈出後）
@@ -28,6 +31,7 @@
    *                    ⚠️ `__u` 不是引擎的記法：引擎的 u 異體是 `_u`，而轉換層把 `_u` 定義成替代母音符號 𑗜，
    *                    `__u` 轉得出 𑗛 是轉換層留下前面那個 `_` 的結果——由 verify.js 第 ② 條逐一盯著
    *   體文 bindu    —— 母音符號與點畫（`aa` `i` … `;m` `.h` `~m` `:-`）
+   *   上接續 ligature_u／下接續 ligature_l —— CBETA 造字的上半／下半部件（見 keysFromElements）
    *   接續 ligature —— 子音的接續形（`k` `kh` … `h` `k.s`）
    * ⚠️ **鍵不寫死在這裡**：分類與字形是 owner 在 BonjiInput.xlsx 裡定的，經 bonji 的
    *    data/catalog.json 匯出；本 app 的 data/catalog.json 是它的 byte-identical 複製件。
@@ -37,7 +41,9 @@
    *    而 Kyoto-Harvard 的大寫有意義——catalog 的 `S`（舊寫法的齒音 s）在 KH 下會變成 ṣ（實測）。
    *    小寫之後兩種輸入法結果相同，記號列就不必分兩套。鍵上印的也是插入的那個字串。
    * 同一組裡同一個記法只留第一個（現況 0 個重複；防的是 xlsx 日後多一列）。 */
-  var KEYSET_IDS = ['vowel', 'variant', 'bindu', 'ligature'];
+  var KEYSET_IDS = ['vowel', 'variant', 'bindu', 'ligature_u', 'ligature_l', 'ligature'];
+  // 這兩組的資料不在 catalog.json（那裡只有 Mojikyo 群），而在 element-catalog.json 的 Cbeta 群
+  var ELEMENT_SETS = { ligature_u: true, ligature_l: true };
 
   function keysFromCatalog(catalog, id) {
     var cats = catalog && catalog.categories;
@@ -54,6 +60,34 @@
       out.push({ ins: ins, glyph: typeof e.char === 'string' ? e.char : '' });
     });
     return out;
+  }
+
+  /* 上接續／下接續：`data/element-catalog.json`（bonji 的複製件，由 db_siddham 匯出）的 Cbeta 群。
+   * 每格一個 CJK 碼位，要用 CBETA 的 `Siddam` 字型才畫得出悉曇部件——手機上沒有那支字型，
+   * 所以鍵上的字形改畫 `cbeta/cbeta-ligatures.svg` 裡的同一個字（scripts/build-cbeta-glyphs.py 產生；
+   * ⚠️ 不進 GitHub，見該腳本檔頭）。本函式只回 `cbeta`（那個碼位），畫不畫得出來是控制器的事。
+   * ⚠️ **不去重**：同一個記法有好幾個字形（上接續 `k` 有 3 種），每個字形一顆鍵——認出字形正是這兩組的用途。
+   * 插入一律小寫（同 keysFromCatalog）；沒有記法的格略過（插不進任何東西）。 */
+  function keysFromElements(elements, id) {
+    var groups = elements && elements.groups;
+    if (!Array.isArray(groups)) return [];
+    var g = null;
+    for (var i = 0; i < groups.length; i++) if (groups[i] && groups[i].id === 'cbeta') { g = groups[i]; break; }
+    var cats = g && g.categories;
+    if (!Array.isArray(cats)) return [];
+    var cat = null;
+    for (var j = 0; j < cats.length; j++) if (cats[j] && cats[j].id === id) { cat = cats[j]; break; }
+    if (!cat || !Array.isArray(cat.entries)) return [];
+    var out = [];
+    cat.entries.forEach(function (e) {
+      if (!e || typeof e.code !== 'string' || !e.code || typeof e.char !== 'string' || !e.char) return;
+      out.push({ ins: e.code.toLowerCase(), cbeta: e.char });
+    });
+    return out;
+  }
+
+  function keysFor(catalog, elements, id) {
+    return ELEMENT_SETS[id] ? keysFromElements(elements, id) : keysFromCatalog(catalog, id);
   }
 
   function normalizeKeyset(id) {
@@ -126,6 +160,9 @@
     KEYBOARD_MIN: KEYBOARD_MIN,
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
     keysFromCatalog: keysFromCatalog,
+    keysFromElements: keysFromElements,
+    keysFor: keysFor,
+    ELEMENT_SETS: ELEMENT_SETS,
     normalizeKeyset: normalizeKeyset,
     insertAt: insertAt,
     shellBox: shellBox,

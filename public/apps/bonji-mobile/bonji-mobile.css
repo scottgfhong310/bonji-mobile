@@ -310,6 +310,16 @@ code {
   line-height: 1.1;
   color: inherit;               /* 裸 span 會被 materialize-dark 的 --mz-text 蓋掉（§5.1 gotcha） */
 }
+/* CBETA 上／下接續的字形（cbeta-ligatures.svg 的 symbol；整個 em 方框，部件在上半或下半——位置本身就是資訊）。
+ * fill 跟著鍵的文字色 ⇒ 主題與按下時的反白都自動對。 */
+.keybar .key-cbeta { padding: 0 4px; }
+.key-svg {
+  display: block;
+  height: 30px;
+  width: auto;
+  aspect-ratio: 1 / 1;
+  fill: currentColor;
+}
 .key-ins {
   font-family: var(--mono-font);
   font-size: .85rem;
@@ -368,7 +378,7 @@ code {
 /* 0,2,1：贏過 Materialize 對 a 的預設色 */
 .in-bar .in-clear:hover { color: var(--danger); background: var(--surface-2); }
 
-/* 記號列切換（母音 → 異體字 → 體文 → 接續）：鈕上的字＝記號列現在是哪一組。
+/* 記號列切換（母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續）：鈕上的字＝記號列現在是哪一組。
  * 裸 <button> ⇒ Materialize 的 teal 互動底要自己蓋掉（§5.1 gotcha），三態都給。 */
 .in-bar .keyset-toggle {
   flex: none;

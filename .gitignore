@@ -31,3 +31,9 @@ artifact/dist/
 # 放行清單：只放授權明確允許再散布的。
 # Noto Sans Siddham：name13 ＝ SIL OFL 1.1，並附 fonts/OFL.txt。
 !/public/apps/bonji-mobile/fonts/NotoSansSiddham-Regular.woff2
+
+# ── CBETA 字形 SVG：不進 GitHub〔owner 2026-10-09〕──────────────────
+# scripts/build-cbeta-glyphs.py 從本機的 CBETA Siddham.ttf（字族 Siddam）抽出上接續／下接續的外框。
+# SVG 路徑就是字型外框的複製，而這支字型沒有再散布的授權 ⇒ owner 決定只隨 Artifacts 版（private）
+# 與 InProgress 鏡像，**本 repo 是 public，一律擋掉**。verify.js 第 ㉕ 條確認它沒被追蹤。
+/public/apps/bonji-mobile/cbeta/

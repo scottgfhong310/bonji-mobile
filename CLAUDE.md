@@ -11,9 +11,10 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 24 條契約檢查
-node scripts/verify.js --selftest        # 30 個反向注入，全部必須被抓到
-python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控）
+npm run verify                           # 26 條契約檢查
+node scripts/verify.js --selftest        # 33 個反向注入，全部必須被抓到
+python3 scripts/build-cbeta-glyphs.py    # CBETA 上／下接續字形 → cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
+python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）
 ```
 
 ## 結構
@@ -29,6 +30,8 @@ public/apps/bonji-mobile/
 ├─ vendor/bonji-input/                   # ⚠️ bonji 的複製件（MIT 引擎，勿改）
 ├─ fonts/{NotoSansSiddham-Regular.woff2, OFL.txt}   # 唯一的字型（OFL）
 ├─ data/catalog.json                     # ⚠️ bonji 的複製件：記號列的母音／異體字／體文／接續（來源 BonjiInput.xlsx）
+├─ data/element-catalog.json             # ⚠️ bonji 的複製件：上接續／下接續（Cbeta 群，由 db_siddham 匯出）
+├─ cbeta/cbeta-ligatures.svg             # ⚠️⚠️ CBETA 字形外框，**.gitignore 擋著、不進 GitHub**（只隨 Artifacts 版與 InProgress 鏡像）
 ├─ side-tool.css · side-tool.js · materialize-dark.css · i18n.js   # 家族共用件複製件
 └─ locales/{zh-Hant,en,ja}.js
 ```
@@ -43,14 +46,15 @@ public/apps/bonji-mobile/
 6. **記號列的鍵不要寫死**（四組依序：母音 → 異體字 → 體文 → 接續，第 ㉔ 條；異體字的 `__u` 靠 bonji 轉換層的副作用，見 DESIGN §6）：由 `data/catalog.json`（owner 的 xlsx）推出，插入一律小寫（KH 下 `S` 會變 ṣ；第 ②③ 條）。
 7. **上緣安全區墊在 `.shell` 上，不要墊在 `.topbar`**——Claude App 裡會被吃進頁首的 48px，標題被遮（第 ⑳ 條）。
 8. **Claude App 裡鍵盤彈出時 iframe 不縮、整頁被往上推**：輸出區上緣會被 App 標題列蓋住 ⇒ 悉曇｜拉丁**左右並排 2:1、文字靠底**、**標籤與複製鈕在欄位底部**；底部安全區以**焦點**判斷、不靠高度（第 ㉒ 條，DESIGN §3.2）。
-9. **不要加 `local()` 字型**：手機上沒有 Mojikyo／Siddam，會畫成一般漢字而看起來正常（DESIGN §5，第 ⑯ 條）。
+9. **`cbeta/` 絕不可以進 GitHub**（CBETA 字形外框，字型沒有再散布授權；owner 2026-10-09 只准隨 Artifacts 版）——第 ㉕ 條盯著；`git add -A` 也擋得住，但不要用 `-f`。
+10. **不要加 `local()` 字型**：手機上沒有 Mojikyo／Siddam，會畫成一般漢字而看起來正常（DESIGN §5，第 ⑯ 條）。
 
 ## 複製件登記
 
 | 檔案 | 權威版 |
 |---|---|
 | `side-tool.css`／`side-tool.js`／`materialize-dark.css`／`i18n.js` | 家族 repo 根（`nodeapp-webapp-family`） |
-| `siddham-converter.js`／`vendor/bonji-input/*`／`fonts/*`／`data/catalog.json` | `bonji/public/apps/bonji/` |
+| `siddham-converter.js`／`vendor/bonji-input/*`／`fonts/*`／`data/catalog.json`／`data/element-catalog.json` | `bonji/public/apps/bonji/` |
 | `artifact/vendor/materialize.min.css` | 與 `bonji/artifact/vendor/` 那份相同（cdnjs Materialize 1.0.0） |
 
 **改就改權威版再同步；不要在本 repo 就地改。** `verify.js` 第 ⑱ 條每次比 md5（上游不在旁邊時 SKIP，SKIP 不是 PASS）。

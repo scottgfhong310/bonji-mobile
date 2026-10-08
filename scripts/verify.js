@@ -36,6 +36,9 @@ async function loadWorld() {
     js: read(path.join(APP, 'bonji-mobile.js')),
     libSrc: read(path.join(APP, 'bonji-mobile-lib.js')),
     catalog: JSON.parse(read(path.join(APP, 'data', 'catalog.json'))),
+    elements: JSON.parse(read(path.join(APP, 'data', 'element-catalog.json'))),
+    // CBETA 字形 sprite：刻意不進 GitHub ⇒ clone 下來的那一份沒有它，㉖ 回 SKIP（不是 PASS）
+    sprite: fs.existsSync(path.join(APP, 'cbeta', 'cbeta-ligatures.svg')) ? read(path.join(APP, 'cbeta', 'cbeta-ligatures.svg')) : null,
     locales: {}
   };
   for (const code of ['zh-Hant', 'en', 'ja']) w.locales[code] = loadLocale(path.join(APP, 'locales', code + '.js'));
@@ -97,6 +100,7 @@ check('② 記號列字形與引擎一致', (w) => {
   const c = new w.SiddhamConverter();
   const bad = [];
   for (const id of w.Lib.KEYSET_IDS) {
+    if (w.Lib.ELEMENT_SETS[id]) continue;   // 上／下接續的字形是 CBETA 造字（CJK 碼位），引擎轉不出來，由 ㉖ 另外驗
     const keys = w.Lib.keysFromCatalog(w.catalog, id);
     if (!keys.length) { bad.push(id + ' 0 個鍵'); continue; }
     for (const k of keys) {
@@ -108,14 +112,14 @@ check('② 記號列字形與引擎一致', (w) => {
   return bad.length ? 'FAIL: ' + bad.join(' ') : true;
 });
 
-// ③ 插入的記法在兩種輸入法下結果相同（catalog 的 `S` 在 KH 下會變成 ṣ ⇒ 插入一律小寫）
+// ③ 插入的記法在兩種輸入法下結果相同（catalog 的 `S` 在 KH 下會變成 ṣ ⇒ 插入一律小寫）；上／下接續以「記法＋a」當探針
 check('③ 記號列在 ISO／KH 下同字', (w) => {
   const iso = new w.SiddhamConverter({ inputMethod: 'ISO15919' });
   const kh = new w.SiddhamConverter({ inputMethod: 'KH' });
   const bad = [];
   for (const id of w.Lib.KEYSET_IDS) {
-    for (const k of w.Lib.keysFromCatalog(w.catalog, id)) {
-      const probe = id === 'bindu' ? 'k' + k.ins : k.ins;
+    for (const k of w.Lib.keysFor(w.catalog, w.elements, id)) {
+      const probe = id === 'bindu' ? 'k' + k.ins : w.Lib.ELEMENT_SETS[id] ? k.ins + 'a' : k.ins;
       if (iso.convert(probe).siddham !== kh.convert(probe).siddham) bad.push(id + ':' + k.ins);
     }
   }
@@ -274,7 +278,7 @@ check('⑱ 複製件 md5', () => {
     ...['side-tool.css', 'side-tool.js', 'i18n.js', 'materialize-dark.css'].map((f) => [path.join(FAMILY, f), f]),
     ...['siddham-converter.js', 'vendor/bonji-input/siddham.js', 'vendor/bonji-input/LICENSE',
       'vendor/bonji-input/SOURCE.md', 'fonts/NotoSansSiddham-Regular.woff2', 'fonts/OFL.txt',
-      'data/catalog.json']
+      'data/catalog.json', 'data/element-catalog.json']
       .map((f) => [path.join(BONJI, f), f])
   ];
   if (!fs.existsSync(FAMILY) || !fs.existsSync(BONJI)) return SKIP;
@@ -334,15 +338,46 @@ check('㉓ 複製鈕在欄位底部', (w) => {
   return bad.length ? 'FAIL: ' + bad.join('、') + ' 的複製鈕不在捲動框之後的 .out-foot 裡' : true;
 });
 
-// ㉔ 記號列四組的順序：母音 → 異體字 → 體文 → 接續〔owner 2026-10-08：先「母音在體文的前面」，再「在母音後加入異體字」〕。
+// ㉔ 記號列六組的順序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續〔owner 2026-10-08／09：母音在體文前、異體字在母音後、上下接續在體文後〕。
 //    切換鈕依 KEYSET_IDS 的順序循環、預設是第一組 ⇒ 順序本身就是規格。
-check('㉔ 記號列四組依序：母音 → 異體字 → 體文 → 接續', (w) => {
+check('㉔ 記號列六組依序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續', (w) => {
   const ids = w.Lib.KEYSET_IDS.join(',');
-  if (ids !== 'vowel,variant,bindu,ligature') return 'FAIL: KEYSET_IDS = ' + ids;
+  if (ids !== 'vowel,variant,bindu,ligature_u,ligature_l,ligature') return 'FAIL: KEYSET_IDS = ' + ids;
+  const nu = w.Lib.keysFor(w.catalog, w.elements, 'ligature_u').length, nl = w.Lib.keysFor(w.catalog, w.elements, 'ligature_l').length;
+  if (nu !== 39 || nl !== 44) return 'FAIL: 上接續 ' + nu + '／下接續 ' + nl + ' 鍵（element-catalog 的 Cbeta 群應為 39／44——不去重）';
   const v = w.Lib.keysFromCatalog(w.catalog, 'variant').map((k) => k.ins).join(' ');
   if (v !== '__i _i _ii __u') return 'FAIL: 異體字組 = ' + v + '（owner 指定 __i _i _ii __u）';
   if (w.Lib.normalizeKeyset('nope') !== 'vowel') return 'FAIL: 認不得的值沒有退回母音';
   return true;
+});
+
+// ㉕ CBETA 字形 SVG 不進 GitHub〔owner 2026-10-09〕：cbeta/ 被 .gitignore 擋著、而且沒有任何檔案被追蹤。
+//    SVG 路徑就是字型外框的複製，而這支字型沒有再散布的授權；本 repo 是 public。
+check('㉕ cbeta/ 不在版控裡', () => {
+  const { execFileSync } = require('child_process');
+  const git = (args) => { try { return execFileSync('git', ['-C', REPO, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); } catch (e) { return null; } };
+  if (git(['rev-parse', '--show-toplevel']) === null) return SKIP;   // 不是 git 工作目錄（例如 Artifacts 的建置產物）
+  const tracked = git(['ls-files', 'public/apps/bonji-mobile/cbeta']);
+  if (tracked === null) return 'FAIL: git ls-files 跑不起來';
+  if (tracked.trim()) return 'FAIL: 這些檔案被追蹤了：' + tracked.trim().split('\n').join(', ');
+  const ign = git(['check-ignore', '-q', 'public/apps/bonji-mobile/cbeta/cbeta-ligatures.svg']);
+  return ign !== null || 'FAIL: .gitignore 沒有擋 cbeta/';
+});
+
+// ㉖ 有 sprite 時：上／下接續的每一個字形都在 sprite 裡、viewBox 是整個 em 方框、外框不是空的。
+//    沒有 sprite（clone 下來的那一份）⇒ SKIP：那是設計好的狀態（鍵只印記法），不是通過。
+check('㉖ CBETA sprite 涵蓋上／下接續', (w) => {
+  if (!w.sprite) return SKIP;
+  const bad = [];
+  for (const id of ['ligature_u', 'ligature_l']) {
+    for (const k of w.Lib.keysFor(w.catalog, w.elements, id)) {
+      const sid = 'cb-' + k.cbeta.codePointAt(0).toString(16);
+      const m = w.sprite.match(new RegExp('<symbol id="' + sid + '" viewBox="0 0 (\\d+) (\\d+)"><path d="([^"]+)"'));
+      if (!m) bad.push(id + ':' + k.ins + '(' + sid + ')');
+      else if (m[3].length < 20) bad.push(sid + ' 外框太短');
+    }
+  }
+  return bad.length ? 'FAIL: ' + bad.slice(0, 8).join(' ') : true;
 });
 
 /* ---------- 工具 ---------- */
@@ -372,7 +407,8 @@ const MUTANTS = [
   ['①', '轉換結果被改', (w) => { const C = w.SiddhamConverter; w.SiddhamConverter = class extends C { convert(i) { const r = super.convert(i); return Object.assign({}, r, { latin: r.latin.toUpperCase() }); } }; }],
   ['②', 'catalog 的接續字形錯一格', (w) => { const e = w.catalog.categories.find((c) => c.id === 'ligature').entries.find((x) => x.group === 'siddham'); e.char = '𑖏𑖿'; }],
   ['②', '例外清單以外的體文對不上', (w) => { const e = w.catalog.categories.find((c) => c.id === 'bindu').entries.find((x) => x.code === 'aa'); e.char = '𑖰'; }],
-  ['③', '插入不轉小寫（S 在 KH 下變 ṣ）', (w) => { const f = w.Lib.keysFromCatalog; w.Lib.keysFromCatalog = (cat, id) => f(cat, id).map((k) => k.ins === 's' ? { ins: 'S', glyph: k.glyph } : k); }],
+  // ⚠️ 換的是 keysFor（③ 走它）——換 keysFromCatalog 的話 keysFor 內部用的是閉包裡那一支，注入會安靜地沒作用（2026-10-09 selftest 抓到）
+  ['③', '插入不轉小寫（S 在 KH 下變 ṣ）', (w) => { const f = w.Lib.keysFor; w.Lib.keysFor = (c, e, id) => f(c, e, id).map((k) => k.ins === 's' ? Object.assign({}, k, { ins: 'S' }) : k); }],
   ['④', 'insertAt 游標算錯', (w) => { const f = w.Lib.insertAt; w.Lib.insertAt = (...a) => { const r = f(...a); return { value: r.value, caret: r.caret - 1 }; }; }],
   ['⑤', 'shellBox 忽略 offsetTop', (w) => { const f = w.Lib.shellBox; w.Lib.shellBox = (m) => { const r = f(m); return r && { top: 0, height: r.height }; }; }],
   ['⑥', '網址列收合被當成鍵盤', (w) => { w.Lib.keyboardOpen = (b, h) => b - h >= 60; }],
@@ -398,6 +434,9 @@ const MUTANTS = [
   ['㉔', '異體字組少一格', (w) => { const c = w.catalog.categories.find((x) => x.id === 'variant'); c.entries = c.entries.filter((e) => e.code !== '_ii'); }],
   ['②', '__u 不再轉出 𑗛（轉換層副作用消失）', (w) => { const c = w.catalog.categories.find((x) => x.id === 'variant'); c.entries.find((e) => e.code === '__u').code = '_u'; }],
   ['⑭', '少了 keyset.vowel 的文案', (w) => { delete w.locales['zh-Hant']['keyset.vowel']; delete w.locales.en['keyset.vowel']; delete w.locales.ja['keyset.vowel']; }],
+  ['㉔', '上接續被去重（少了同記法的異體）', (w) => { const f = w.Lib.keysFor; w.Lib.keysFor = (c, e, id) => { const ks = f(c, e, id); const seen = {}; return id === 'ligature_u' ? ks.filter((k) => !seen[k.ins] && (seen[k.ins] = 1)) : ks; }; }],
+  ['㉔', '上下接續排到接續後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 6, 'vowel', 'variant', 'bindu', 'ligature', 'ligature_u', 'ligature_l'); }],
+  ['㉖', 'sprite 少一個字形', (w) => { if (w.sprite) w.sprite = w.sprite.replace(/<symbol id="cb-65d0"[^]*?<\/symbol>/, ''); else w.sprite = '<svg></svg>'; }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 

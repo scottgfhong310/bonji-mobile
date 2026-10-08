@@ -19,6 +19,10 @@ bonji-mobile 本來就零後端，所以 Artifact 版只差一件事：
   （bonji 的另外四件——backend:false、downloads capability、對照表換頁、不帶 xlsx——這裡都不存在。）
 
 ⚠️ 字型：只有 Noto Sans Siddham（OFL）。`verify()` 在最後擋著：dist 裡出現別的字型檔就 exit 1。
+⚠️⚠️ **CBETA 上／下接續的 SVG（`cbeta/cbeta-ligatures.svg`）要隨 Artifacts 版**〔owner 2026-10-09：
+   「放進 Artifacts，不進 GitHub」〕——它不在 repo 裡（.gitignore 擋著），要先在本機跑
+   `python3 scripts/build-cbeta-glyphs.py` 產生。**缺了就建置失敗**：少了它 Artifacts 版的上下接續只剩記法，
+   而那正是 owner 要它的理由；要刻意建一份不帶字形的，加 `--no-cbeta`。
 ⚠️ 已知未驗：Artifacts 版跑在宿主頁的 iframe 裡，鍵盤彈出時 iframe 自己的 visualViewport
    會不會跟著縮，**取決於宿主**，不是本 app 控制得了的（見 DESIGN.md §6）。
 """
@@ -45,6 +49,9 @@ FONT_ALLOWED = {'fonts/NotoSansSiddham-Regular.woff2'}
 
 
 def main():
+    unknown = [a for i, a in enumerate(sys.argv[1:], 1) if a not in ('--out', '--no-cbeta') and sys.argv[i - 1] != '--out']
+    if unknown:
+        print('✗ 未知旗標：%s' % ' '.join(unknown)); return 2
     out = pathlib.Path(sys.argv[sys.argv.index('--out') + 1]).resolve() \
         if '--out' in sys.argv else HERE / 'dist'
     if not APP.is_dir():
@@ -90,6 +97,15 @@ def main():
                 bad.append('含 NUL：' + rel)
             if p.suffix == '.html' and 'cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/' in t:
                 bad.append('仍引用 cdnjs 樣式表：' + rel)
+    sprite = out / 'cbeta' / 'cbeta-ligatures.svg'
+    if '--no-cbeta' in sys.argv:
+        if sprite.exists():
+            shutil.rmtree(out / 'cbeta')
+        print('  · --no-cbeta：不帶 CBETA 字形（上下接續只印記法）')
+    elif not sprite.exists() or '<symbol' not in sprite.read_text(encoding='utf-8'):
+        bad.append('缺 cbeta/cbeta-ligatures.svg——先跑 python3 scripts/build-cbeta-glyphs.py（或加 --no-cbeta）')
+    else:
+        print('  ✓ 帶 CBETA 上／下接續字形（%d 個 symbol）' % sprite.read_text(encoding='utf-8').count('<symbol'))
     if bad:
         for b in bad:
             print('  ✗ ' + b)

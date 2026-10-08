@@ -18,7 +18,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
   var THEME_KEY = 'bonji-mobile-theme';
   var TOOLS_KEY = 'bonji-mobile-tools';   // 'on' | 'off'；手機上預設 off（側鍵會壓在輸出右緣）
   var DRAFT_KEY = 'bonji-mobile-draft';   // { input, options }（BonjiMobileLib.normalizeDraft）
-  var KEYSET_KEY = 'bonji-mobile-keyset'; // 'vowel' | 'variant' | 'bindu' | 'ligature'：記號列現在是哪一組
+  var KEYSET_KEY = 'bonji-mobile-keyset'; // KEYSET_IDS 之一（lib）：記號列現在是哪一組
 
   var converter = new SiddhamConverter();
   var setIconDone = window.SideTool.setIconDone;
@@ -34,7 +34,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     latin: document.getElementById('out-latin')
   };
 
-  var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'vowel', catalog: null, catalogFailed: false };
+  var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'vowel', catalog: null, elements: null, catalogFailed: false, sprite: {} };
 
   /* ---------- 外殼：貼齊可見範圍 ----------
    * iOS Safari 鍵盤彈出時不縮 layout viewport、而且會把頁面往上推；只有 visualViewport
@@ -112,22 +112,66 @@ import { SiddhamConverter } from "./siddham-converter.js";
     saveDraftSoon();
   }
 
-  /* ---------- 記號列（母音 → 異體字 → 體文 → 接續） ----------
+  /* ---------- 記號列（母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續） ----------
    * 鍵由 data/catalog.json 推出（bonji 的複製件；分類與字形是 owner 在 BonjiInput.xlsx 定的）。
    * 讀不到就在記號列上講出來——空著的記號列與「這支 app 沒有這個功能」長得一樣。 */
+  function getJson(url) {
+    return fetch(url, { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+  }
+
   function loadCatalog() {
-    return fetch('./data/catalog.json', { cache: 'no-store' })
-      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (c) { state.catalog = c; })
+    return Promise.all([getJson('./data/catalog.json'), getJson('./data/element-catalog.json')])
+      .then(function (a) { state.catalog = a[0]; state.elements = a[1]; })
       .catch(function (e) {
-        console.error('catalog.json 讀取失敗：', e);
+        console.error('catalog.json／element-catalog.json 讀取失敗：', e);
         state.catalogFailed = true;
+      })
+      .then(loadSprite);
+  }
+
+  /* 上接續／下接續的 CBETA 字形（cbeta/cbeta-ligatures.svg，scripts/build-cbeta-glyphs.py 產生）。
+   * ⚠️ **它刻意不在 GitHub 裡**（字型沒有再散布的授權；owner 2026-10-09：只隨 Artifacts 版與 InProgress 鏡像）
+   *    ⇒ 讀不到是正常狀態，不是錯誤：那兩組的鍵照樣能插入記法，只是鍵上不畫字形。
+   * 讀到就整份插進 DOM（隱藏），鍵上用 <use href="#cb-xxxx"> 引用——fill 走 currentColor，跟著主題。 */
+  function loadSprite() {
+    return fetch('./cbeta/cbeta-ligatures.svg', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : ''; })
+      .catch(function () { return ''; })
+      .then(function (txt) {
+        if (txt.indexOf('<symbol') < 0) return;
+        var doc = new DOMParser().parseFromString(txt, 'image/svg+xml');
+        var svg = doc.documentElement;
+        if (!svg || svg.nodeName !== 'svg') return;
+        var holder = document.createElement('div');
+        holder.id = 'cbeta-sprite';
+        holder.hidden = true;
+        holder.appendChild(document.importNode(svg, true));
+        document.body.appendChild(holder);
+        holder.querySelectorAll('symbol[id]').forEach(function (sym) {
+          state.sprite[sym.id] = sym.getAttribute('viewBox');
+        });
       });
+  }
+
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  function cbetaGlyph(ch) {
+    var id = 'cb-' + ch.codePointAt(0).toString(16);
+    var vb = state.sprite[id];
+    if (!vb) return null;
+    var svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', vb);
+    svg.setAttribute('class', 'key-svg');
+    svg.setAttribute('aria-hidden', 'true');
+    var use = document.createElementNS(SVG_NS, 'use');
+    use.setAttribute('href', '#' + id);
+    svg.appendChild(use);
+    return svg;
   }
 
   function renderKeybar() {
     $keybar.textContent = '';
-    var keys = Lib.keysFromCatalog(state.catalog, state.keyset);
+    var keys = Lib.keysFor(state.catalog, state.elements, state.keyset);
     if (!keys.length) {
       if (!state.catalog && !state.catalogFailed) return;   // 還在讀
       var note = document.createElement('span');
@@ -147,6 +191,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
         g.className = 'key-glyph';
         g.textContent = k.glyph;
         b.appendChild(g);
+      } else if (k.cbeta) {
+        var svg = cbetaGlyph(k.cbeta);   // 沒有 sprite（GitHub 那一份）就只印記法
+        if (svg) { b.appendChild(svg); b.classList.add('key-cbeta'); }
+        b.setAttribute('title', k.ins + '（CBETA U+' + k.cbeta.codePointAt(0).toString(16).toUpperCase() + '）');
       }
       var s = document.createElement('span');
       s.className = 'key-ins';
@@ -333,7 +381,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     keysetBtn.addEventListener('click', function (e) { e.preventDefault(); toggleKeyset(); });
     document.addEventListener('i18n:changed', function () {
       renderKeysetToggle();
-      if (!Lib.keysFromCatalog(state.catalog, state.keyset).length) renderKeybar();   // 失敗說明跟著語言走
+      if (!Lib.keysFor(state.catalog, state.elements, state.keyset).length) renderKeybar();   // 失敗說明跟著語言走
     });
 
     var clearBtn = document.getElementById('clear-input');

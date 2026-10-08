@@ -12,7 +12,7 @@ Part of the **nodeapp WebApp family**: <https://github.com/scottgfhong310/nodeap
 
 - **One screen, no page scroll**: Siddhaṁ and transliteration sit **side by side (2:1 width)**, each scrolling on its own with text anchored at the bottom next to the input, following the newest characters while you type at the end.
 - **Follows the keyboard**: the screen shrinks to the top of the on-screen keyboard (`visualViewport` on iOS, `interactive-widget=resizes-content` on Android); the header folds away to give the output more room.
-- **Key row (vowel → variant → bindu → ligature)**: a button right of the input cycles through **vowel** (`a` `aa` `i` … `a;m`), **variant** (`__i` 𑗘 `_i` 𑗙 `_ii` 𑗚 `__u` 𑗛), **bindu** (`aa` `i` `;m` `.h` `~m` …) and **ligature** (`k` `kh` `.t` `;s` …) keys, each with its Siddhaṁ glyph; tapping a key keeps the keyboard open. Groups and glyphs come from bonji's `BonjiInput.xlsx`.
+- **Key row (vowel → variant → bindu → upper → lower → ligature)**: a button right of the input cycles through six groups (upper/lower ligature keys draw CBETA glyphs, see *CBETA glyphs* below): **vowel** (`a` `aa` `i` … `a;m`), **variant** (`__i` 𑗘 `_i` 𑗙 `_ii` 𑗚 `__u` 𑗛), **bindu** (`aa` `i` `;m` `.h` `~m` …) and **ligature** (`k` `kh` `.t` `;s` …) keys, each with its Siddhaṁ glyph; tapping a key keeps the keyboard open. Groups and glyphs come from bonji's `BonjiInput.xlsx`.
 - **Options** (`tune`, top right): input method (ISO 15919 / Kyoto-Harvard), transliteration (ISO 15919 / IAST), ignore spaces & hyphens.
 - Copy buttons on both outputs; example chips; input and options are kept as a draft in your browser only.
 - Bundled **Noto Sans Siddham** (SIL OFL); three UI languages (`zh-Hant` / `en` / `ja`); light / dark themes.
@@ -27,6 +27,10 @@ npm install
 npm start                 # → http://localhost:3000/apps/bonji-mobile/
 npm run verify            # contract checks
 ```
+
+## CBETA glyphs
+
+The upper/lower ligature keys draw glyphs from the CBETA Siddham font (`Siddam`), extracted to SVG by `scripts/build-cbeta-glyphs.py` from a locally installed copy. **That font carries no redistribution licence, so the SVG is not in this repo** — in a fresh clone those keys show the notation only (they still insert).
 
 ## License
 
