@@ -550,6 +550,26 @@
    "id": "variant",
    "entries": [
     {
+     "code": "__i",
+     "char": "𑗘",
+     "group": "siddham"
+    },
+    {
+     "code": "_i",
+     "char": "𑗙",
+     "group": "siddham"
+    },
+    {
+     "code": "_ii",
+     "char": "𑗚",
+     "group": "siddham"
+    },
+    {
+     "code": "__u",
+     "char": "𑗛",
+     "group": "siddham"
+    },
+    {
      "code": "",
      "char": "下",
      "group": "mojikyo119"
