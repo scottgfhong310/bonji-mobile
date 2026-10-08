@@ -167,7 +167,7 @@ body.kb-open .topbar { display: none; }
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 4px 12px 8px;
+  padding: 8px 12px 2px;
   box-sizing: border-box;
 }
 /* 2:1 寫進 flex-basis（不寫成 2:1 的 grow）：兩塊的內距與框線相同，grow 只分剩下的寬度，
@@ -176,12 +176,16 @@ body.kb-open .topbar { display: none; }
 .out-block-siddham { flex: 0 0 calc((100% - 8px) * 2 / 3); }
 .out-block-latin { flex: 1 1 0; }
 
-.out-head {
+/* 標籤＋複製鈕在欄位底部（理由見 index.html）：頂端那一截在 Claude App 裡鍵盤開著時被 App 標題列蓋住。
+ * 上緣一條細線與文字分開——文字靠底，否則最後一行會貼著標籤讀成同一段。 */
+.out-foot {
   flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 32px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
 }
 
 .out-label {

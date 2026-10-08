@@ -321,6 +321,18 @@ check('㉒ 並排 2:1／文字靠底／聚焦不墊底', (w) => {
   return miss.length ? 'FAIL: ' + miss.join('、') : true;
 });
 
+// ㉓ 複製鈕在欄位底部〔owner 2026-10-08〕：Claude App 裡鍵盤開著時欄位頂端被 App 標題列蓋住（㉒ 同一個成因），
+//    放頂端就按不到。每一欄都要「捲動框在前、含複製鈕的 .out-foot 在後」。
+check('㉓ 複製鈕在欄位底部', (w) => {
+  const bad = [];
+  for (const k of ['siddham', 'latin']) {
+    const blk = (w.html.match(new RegExp('<div class="out-block out-block-' + k + '">[\\s\\S]*?\\n      </div>')) || [''])[0];
+    const v = blk.indexOf('id="out-' + k + '"'), f = blk.indexOf('class="out-foot"'), c = blk.indexOf('data-copy="' + k + '"');
+    if (!(v >= 0 && v < f && f < c)) bad.push(k);
+  }
+  return bad.length ? 'FAIL: ' + bad.join('、') + ' 的複製鈕不在捲動框之後的 .out-foot 裡' : true;
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -369,6 +381,7 @@ const MUTANTS = [
   ['㉒', '比例寫成 grow 2:1', (w) => { w.css = w.css.replace('flex: 0 0 calc((100% - 8px) * 2 / 3)', 'flex: 2 1 0'); }],
   ['㉒', '文字不靠底', (w) => { w.css = w.css.replace(/(^\.out-text\s*\{[^}]*?)margin-top:\s*auto;/m, '$1'); }],
   ['㉒', '聚焦時仍墊底部安全區', (w) => { w.css = w.css.replace('.shell:has(#bm-input:focus) { padding-bottom: 0; }', ''); }],
+  ['㉓', '拉丁欄的複製列搬回頂端', (w) => { w.html = w.html.replace(/(<div class="out-block out-block-latin">\n)(        <div class="out-value">.*\n)((?:.*\n){6})/, '$1$3$2'); }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 

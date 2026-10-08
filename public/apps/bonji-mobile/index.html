@@ -32,24 +32,26 @@
     </header>
 
     <section class="out-pane" id="out-pane">
+      <!-- 每一欄：捲動框在上、標籤＋複製鈕在**底部**（.out-foot）。
+           Claude App 裡鍵盤彈出時整頁被往上推，欄位頂端會落在 App 標題列底下——放在頂端的話複製鈕按不到。
+           .out-value 是捲動框、.out-text 是文字：文字靠底（margin-top:auto），短的時候貼著底列。 -->
       <div class="out-block out-block-siddham">
-        <div class="out-head">
+        <div class="out-value"><div id="out-siddham" class="out-text siddham-text" aria-live="polite"></div></div>
+        <div class="out-foot">
           <span class="out-label" data-i18n="out.siddham">悉曇 Siddhaṁ</span>
           <a href="#!" class="out-copy" data-copy="siddham" data-i18n-title="tool.copy" title="複製">
             <i class="material-icons">content_copy</i>
           </a>
         </div>
-        <!-- .out-value 是捲動框、.out-text 是文字：文字靠底（margin-top:auto），短的時候貼著記號列 -->
-        <div class="out-value"><div id="out-siddham" class="out-text siddham-text" aria-live="polite"></div></div>
       </div>
       <div class="out-block out-block-latin">
-        <div class="out-head">
+        <div class="out-value"><div id="out-latin" class="out-text latin-text"></div></div>
+        <div class="out-foot">
           <span class="out-label" data-i18n="out.latin">拉丁轉寫</span>
           <a href="#!" class="out-copy" data-copy="latin" data-i18n-title="tool.copy" title="複製">
             <i class="material-icons">content_copy</i>
           </a>
         </div>
-        <div class="out-value"><div id="out-latin" class="out-text latin-text"></div></div>
       </div>
 
       <!-- 空狀態：輸入是空的時候取代上面兩塊 -->
