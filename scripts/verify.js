@@ -88,7 +88,7 @@ function bonjiVectors() {
 }
 
 // ② 記號列的字形：catalog 的 char（owner 在 xlsx 定的）必須等於引擎轉出來的那個字（兩條路取期望值）。
-//    體文是附在子音上的符號 ⇒ 探針用 `k`＋記法、比結尾；接續直接比。
+//    體文是附在子音上的符號 ⇒ 探針用 `k`＋記法、比結尾；母音與接續直接比。
 //    ⚠️ 已知例外寫成清單、不是放寬比對：體文 `a` 在 xlsx 裡的字形是 U+115C0（nukta），而 `a` 是固有母音、
 //       引擎不畫任何符號——**那是來源資料的寫法，本 app 照原樣顯示**。清單以外的對不上一律紅。
 const GLYPH_EXCEPTIONS = { bindu: ['a'] };
@@ -333,6 +333,15 @@ check('㉓ 複製鈕在欄位底部', (w) => {
   return bad.length ? 'FAIL: ' + bad.join('、') + ' 的複製鈕不在捲動框之後的 .out-foot 裡' : true;
 });
 
+// ㉔ 記號列三組的順序：母音 → 體文 → 接續〔owner 2026-10-08：「增加一組母音在體文的前面」〕。
+//    切換鈕依 KEYSET_IDS 的順序循環、預設是第一組 ⇒ 順序本身就是規格。
+check('㉔ 記號列三組依序：母音 → 體文 → 接續', (w) => {
+  const ids = w.Lib.KEYSET_IDS.join(',');
+  if (ids !== 'vowel,bindu,ligature') return 'FAIL: KEYSET_IDS = ' + ids;
+  if (w.Lib.normalizeKeyset('nope') !== 'vowel') return 'FAIL: 認不得的值沒有退回母音';
+  return true;
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -382,6 +391,8 @@ const MUTANTS = [
   ['㉒', '文字不靠底', (w) => { w.css = w.css.replace(/(^\.out-text\s*\{[^}]*?)margin-top:\s*auto;/m, '$1'); }],
   ['㉒', '聚焦時仍墊底部安全區', (w) => { w.css = w.css.replace('.shell:has(#bm-input:focus) { padding-bottom: 0; }', ''); }],
   ['㉓', '拉丁欄的複製列搬回頂端', (w) => { w.html = w.html.replace(/(<div class="out-block out-block-latin">\n)(        <div class="out-value">.*\n)((?:.*\n){6})/, '$1$3$2'); }],
+  ['㉔', '母音排到體文後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 3, 'bindu', 'vowel', 'ligature'); }],
+  ['⑭', '少了 keyset.vowel 的文案', (w) => { delete w.locales['zh-Hant']['keyset.vowel']; delete w.locales.en['keyset.vowel']; delete w.locales.ja['keyset.vowel']; }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 

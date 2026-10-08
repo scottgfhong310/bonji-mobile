@@ -12,7 +12,7 @@ Part of the **nodeapp WebApp family**: <https://github.com/scottgfhong310/nodeap
 
 - **One screen, no page scroll**: Siddhaṁ and transliteration sit **side by side (2:1 width)**, each scrolling on its own with text anchored at the bottom next to the input, following the newest characters while you type at the end.
 - **Follows the keyboard**: the screen shrinks to the top of the on-screen keyboard (`visualViewport` on iOS, `interactive-widget=resizes-content` on Android); the header folds away to give the output more room.
-- **Key row (bindu ⇄ ligature)**: a button right of the input switches between **bindu** (`aa` `i` `;m` `.h` `~m` …) and **ligature** (`k` `kh` `.t` `;s` …) keys, each with its Siddhaṁ glyph; tapping a key keeps the keyboard open. Groups and glyphs come from bonji's `BonjiInput.xlsx`.
+- **Key row (vowel → bindu → ligature)**: a button right of the input cycles through **vowel** (`a` `aa` `i` … `a;m`), **bindu** (`aa` `i` `;m` `.h` `~m` …) and **ligature** (`k` `kh` `.t` `;s` …) keys, each with its Siddhaṁ glyph; tapping a key keeps the keyboard open. Groups and glyphs come from bonji's `BonjiInput.xlsx`.
 - **Options** (`tune`, top right): input method (ISO 15919 / Kyoto-Harvard), transliteration (ISO 15919 / IAST), ignore spaces & hyphens.
 - Copy buttons on both outputs; example chips; input and options are kept as a draft in your browser only.
 - Bundled **Noto Sans Siddham** (SIL OFL); three UI languages (`zh-Hant` / `en` / `ja`); light / dark themes.

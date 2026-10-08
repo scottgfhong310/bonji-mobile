@@ -4,7 +4,7 @@
  * 悉曇轉換本身不在這裡：唯一的轉換介面是 ./siddham-converter.js（ESM 防腐層，
  * bonji 的 byte-identical 複製件）。本檔放的是**這支 app 自己的、離開畫面仍成立**的邏輯：
  *
- *   KEYSET_IDS                 記號列的兩組：'bindu'（體文）／'ligature'（接續）
+ *   KEYSET_IDS                 記號列的三組（切換順序）：'vowel'（母音）→ 'bindu'（體文）→ 'ligature'（接續）
  *   keysFromCatalog(cat, id)   → [{ ins, glyph }] —— 由 bonji 的 data/catalog.json 推出該組的鍵
  *   normalizeKeyset(id)        → 白名單版本（從 localStorage 讀回來的不可信）
  *   insertAt(value, s, e, t)   → { value, caret } —— 把 t 插在選取範圍 [s, e) 上
@@ -22,7 +22,8 @@
 
   /* ---------- 記號列 ----------
    * 手機鍵盤上 `;` `.` `,` `~` 要切到符號頁才打得到，而這套記法幾乎每個字都要用
-   * ⇒ 做成一鍵插入，分兩組切換（輸入框右側那顆鈕）：
+   * ⇒ 做成一鍵插入，分三組切換（輸入框右側那顆鈕，依此順序循環；母音排第一〔owner 2026-10-08〕）：
+   *   母音 vowel    —— 獨立母音（`a` `aa` `i` … `au` `a;m` `a~m` `a.h`）
    *   體文 bindu    —— 母音符號與點畫（`aa` `i` … `;m` `.h` `~m` `:-`）
    *   接續 ligature —— 子音的接續形（`k` `kh` … `h` `k.s`）
    * ⚠️ **鍵不寫死在這裡**：分類與字形是 owner 在 BonjiInput.xlsx 裡定的，經 bonji 的
@@ -33,7 +34,7 @@
    *    而 Kyoto-Harvard 的大寫有意義——catalog 的 `S`（舊寫法的齒音 s）在 KH 下會變成 ṣ（實測）。
    *    小寫之後兩種輸入法結果相同，記號列就不必分兩套。鍵上印的也是插入的那個字串。
    * 同一組裡同一個記法只留第一個（現況 0 個重複；防的是 xlsx 日後多一列）。 */
-  var KEYSET_IDS = ['bindu', 'ligature'];
+  var KEYSET_IDS = ['vowel', 'bindu', 'ligature'];
 
   function keysFromCatalog(catalog, id) {
     var cats = catalog && catalog.categories;
