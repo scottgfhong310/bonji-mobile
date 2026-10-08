@@ -4,16 +4,17 @@
  * 悉曇轉換本身不在這裡：唯一的轉換介面是 ./siddham-converter.js（ESM 防腐層，
  * bonji 的 byte-identical 複製件）。本檔放的是**這支 app 自己的、離開畫面仍成立**的邏輯：
  *
- *   KEYSETS                    記號列的鍵（依輸入法分兩套）
- *   keysFor(inputMethod)       → 該輸入法的鍵陣列（認不得的輸入法退回 ISO15919）
- *   previewOf(key)             → { ascii, dotted } | null —— 鍵上那個小悉曇字要怎麼算
+ *   KEYSET_IDS                 記號列的兩組：'bindu'（體文）／'ligature'（接續）
+ *   keysFromCatalog(cat, id)   → [{ ins, glyph }] —— 由 bonji 的 data/catalog.json 推出該組的鍵
+ *   normalizeKeyset(id)        → 白名單版本（從 localStorage 讀回來的不可信）
  *   insertAt(value, s, e, t)   → { value, caret } —— 把 t 插在選取範圍 [s, e) 上
  *   shellBox(m)                → { top, height } —— 外殼該貼齊的可見範圍（鍵盤彈出後）
  *   keyboardOpen(base, h)      → boolean —— 可見高度比基準少到「一定是鍵盤」了沒
  *   normalizeOptions(o)        → 三個選項的白名單版本（從 localStorage 讀回來的不可信）
  *   normalizeDraft(d)          → { input, options } —— 草稿同上
  *
- * 資料格式：草稿 `{ input: string, options: { inputMethod, transliteration, ignoreSpacesAndHyphens } }`。
+ * 資料格式：catalog `{ categories: [{ id, entries: [{ code, char, group }] }] }`（bonji 的 BonjiInput.xlsx 匯出）；
+ *           草稿 `{ input: string, options: { inputMethod, transliteration, ignoreSpacesAndHyphens } }`。
  * 後端 API：無（零後端，DATABASE_GUIDELINES §0 的第 0 層）。
  */
 (function (root) {
@@ -21,45 +22,38 @@
 
   /* ---------- 記號列 ----------
    * 手機鍵盤上 `;` `.` `,` `~` 要切到符號頁才打得到，而這套記法幾乎每個字都要用
-   * ⇒ 常用組合做成一鍵插入。
-   * kind：'sign'（以 ◌ 承載）／'vowel'（獨立母音）／'cons'（子音＋a 示其本字）／'punct'（無預覽）。
-   * iso：預覽一律用 ISO15919 記法算（KH 的鍵也換成它，算出來的字才對得上）。
-   * ⚠️ 預覽只是「這顆鍵是什麼」的提示；插進輸入框的永遠是 ins。 */
-  var ISO = [
-    { ins: ';m', kind: 'sign' }, { ins: '.h', kind: 'sign' }, { ins: '~m', kind: 'sign' },
-    { ins: 'aa', kind: 'vowel' }, { ins: 'ii', kind: 'vowel' }, { ins: 'uu', kind: 'vowel' },
-    { ins: '.t', kind: 'cons' }, { ins: '.th', kind: 'cons' }, { ins: '.d', kind: 'cons' },
-    { ins: '.dh', kind: 'cons' }, { ins: '.n', kind: 'cons' }, { ins: ';n', kind: 'cons' },
-    { ins: '~n', kind: 'cons' }, { ins: ';s', kind: 'cons' }, { ins: '.s', kind: 'cons' },
-    { ins: ',r', kind: 'vowel' },
-    { ins: '-', kind: 'punct' }, { ins: ';', kind: 'punct' }, { ins: '.', kind: 'punct' },
-    { ins: ',', kind: 'punct' }, { ins: '~', kind: 'punct' }
-  ];
-  // Kyoto-Harvard：大寫字母本來就在鍵盤上，但要按 shift，而手機的 shift 只管下一個字
-  var KH = [
-    { ins: 'M', iso: ';m', kind: 'sign' }, { ins: 'H', iso: '.h', kind: 'sign' },
-    { ins: '~M', iso: '~m', kind: 'sign' },
-    { ins: 'A', iso: 'aa', kind: 'vowel' }, { ins: 'I', iso: 'ii', kind: 'vowel' },
-    { ins: 'U', iso: 'uu', kind: 'vowel' },
-    { ins: 'T', iso: '.t', kind: 'cons' }, { ins: 'Th', iso: '.th', kind: 'cons' },
-    { ins: 'D', iso: '.d', kind: 'cons' }, { ins: 'Dh', iso: '.dh', kind: 'cons' },
-    { ins: 'N', iso: '.n', kind: 'cons' }, { ins: 'G', iso: ';n', kind: 'cons' },
-    { ins: 'J', iso: '~n', kind: 'cons' }, { ins: 'z', iso: ';s', kind: 'cons' },
-    { ins: 'S', iso: '.s', kind: 'cons' }, { ins: 'R', iso: ',r', kind: 'vowel' },
-    { ins: '-', kind: 'punct' }
-  ];
-  var KEYSETS = { ISO15919: ISO, KH: KH };
+   * ⇒ 做成一鍵插入，分兩組切換（輸入框右側那顆鈕）：
+   *   體文 bindu    —— 母音符號與點畫（`aa` `i` … `;m` `.h` `~m` `:-`）
+   *   接續 ligature —— 子音的接續形（`k` `kh` … `h` `k.s`）
+   * ⚠️ **鍵不寫死在這裡**：分類與字形是 owner 在 BonjiInput.xlsx 裡定的，經 bonji 的
+   *    data/catalog.json 匯出；本 app 的 data/catalog.json 是它的 byte-identical 複製件。
+   *    寫死一份就是第二份真相，xlsx 改了這裡不會知道。
+   * 只取 group === 'siddham'（Unicode 悉曇，Noto 畫得出來）；Mojikyo／Siddam 兩群手機上沒有字型。
+   * ⚠️ **插入的是小寫記法**：ISO 15919 的對應本來就不分大小寫（引擎先 toLowerCase），
+   *    而 Kyoto-Harvard 的大寫有意義——catalog 的 `S`（舊寫法的齒音 s）在 KH 下會變成 ṣ（實測）。
+   *    小寫之後兩種輸入法結果相同，記號列就不必分兩套。鍵上印的也是插入的那個字串。
+   * 同一組裡同一個記法只留第一個（現況 0 個重複；防的是 xlsx 日後多一列）。 */
+  var KEYSET_IDS = ['bindu', 'ligature'];
 
-  function keysFor(inputMethod) {
-    return KEYSETS[inputMethod] || KEYSETS.ISO15919;
+  function keysFromCatalog(catalog, id) {
+    var cats = catalog && catalog.categories;
+    if (!Array.isArray(cats)) return [];
+    var cat = null;
+    for (var i = 0; i < cats.length; i++) if (cats[i] && cats[i].id === id) { cat = cats[i]; break; }
+    if (!cat || !Array.isArray(cat.entries)) return [];
+    var seen = {}, out = [];
+    cat.entries.forEach(function (e) {
+      if (!e || e.group !== 'siddham' || typeof e.code !== 'string' || !e.code) return;
+      var ins = e.code.toLowerCase();
+      if (seen[ins]) return;
+      seen[ins] = true;
+      out.push({ ins: ins, glyph: typeof e.char === 'string' ? e.char : '' });
+    });
+    return out;
   }
 
-  function previewOf(key) {
-    if (!key || key.kind === 'punct') return null;
-    var a = key.iso || key.ins;
-    if (key.kind === 'cons') return { ascii: a + 'a', dotted: false };
-    if (key.kind === 'sign') return { ascii: a, dotted: true };
-    return { ascii: a, dotted: false };
+  function normalizeKeyset(id) {
+    return KEYSET_IDS.indexOf(id) >= 0 ? id : KEYSET_IDS[0];
   }
 
   /* ---------- 插入 ----------
@@ -124,11 +118,11 @@
   function clamp(x, lo, hi) { return Math.min(hi, Math.max(lo, x)); }
 
   root.BonjiMobileLib = {
-    KEYSETS: KEYSETS,
+    KEYSET_IDS: KEYSET_IDS,
     KEYBOARD_MIN: KEYBOARD_MIN,
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
-    keysFor: keysFor,
-    previewOf: previewOf,
+    keysFromCatalog: keysFromCatalog,
+    normalizeKeyset: normalizeKeyset,
     insertAt: insertAt,
     shellBox: shellBox,
     keyboardOpen: keyboardOpen,

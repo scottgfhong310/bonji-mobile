@@ -1,0 +1,1440 @@
+{
+ "source": "BonjiInput.xlsx",
+ "fonts": {
+  "siddham": "Noto Sans Siddham (Unicode, bundled)",
+  "mojikyo119": "Mojikyo M119 (local install)",
+  "uniSiddham": "Siddam (local install)"
+ },
+ "categories": [
+  {
+   "id": "vowel",
+   "entries": [
+    {
+     "code": "a",
+     "char": "𑖀",
+     "group": "siddham"
+    },
+    {
+     "code": "aa",
+     "char": "𑖁",
+     "group": "siddham"
+    },
+    {
+     "code": "i",
+     "char": "𑖂",
+     "group": "siddham"
+    },
+    {
+     "code": "ii",
+     "char": "𑖃",
+     "group": "siddham"
+    },
+    {
+     "code": "u",
+     "char": "𑖄",
+     "group": "siddham"
+    },
+    {
+     "code": "uu",
+     "char": "𑖅",
+     "group": "siddham"
+    },
+    {
+     "code": ",r",
+     "char": "𑖆",
+     "group": "siddham"
+    },
+    {
+     "code": ",rr",
+     "char": "𑖇",
+     "group": "siddham"
+    },
+    {
+     "code": ",l",
+     "char": "𑖈",
+     "group": "siddham"
+    },
+    {
+     "code": ",ll",
+     "char": "𑖉",
+     "group": "siddham"
+    },
+    {
+     "code": "e",
+     "char": "𑖊",
+     "group": "siddham"
+    },
+    {
+     "code": "ai",
+     "char": "𑖋",
+     "group": "siddham"
+    },
+    {
+     "code": "o",
+     "char": "𑖌",
+     "group": "siddham"
+    },
+    {
+     "code": "au",
+     "char": "𑖍",
+     "group": "siddham"
+    },
+    {
+     "code": "a;m",
+     "char": "𑖀𑖽",
+     "group": "siddham"
+    },
+    {
+     "code": "a~m",
+     "char": "𑖀𑖼",
+     "group": "siddham"
+    },
+    {
+     "code": "a.h",
+     "char": "𑖀𑖾",
+     "group": "siddham"
+    },
+    {
+     "code": "a",
+     "char": "乾",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "aa",
+     "char": "侃",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ii",
+     "char": "寒",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ai",
+     "char": "巻",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "a;m",
+     "char": "姦",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "a.h",
+     "char": "完",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "a",
+     "char": "換",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "aa",
+     "char": "敢",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "a",
+     "char": "柑",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "aa",
+     "char": "歓",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "aa",
+     "char": "款",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "aa",
+     "char": "棺",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "澗",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "潅",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "環",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "肝",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "甘",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "監",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "i",
+     "char": "看",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ii",
+     "char": "缶",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ii",
+     "char": "翰",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ii",
+     "char": "艦",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ii",
+     "char": "莞",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ii",
+     "char": "観",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "u",
+     "char": "間",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "u",
+     "char": "閑",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "uu",
+     "char": "関",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "uu",
+     "char": "陥",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",r",
+     "char": "願",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",r",
+     "char": "企",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",rr",
+     "char": "伎",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",rr",
+     "char": "危",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",l",
+     "char": "器",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",l",
+     "char": "基",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "e",
+     "char": "舘",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "e",
+     "char": "丸",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ai",
+     "char": "含",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ai",
+     "char": "岸",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "o",
+     "char": "巌",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "o",
+     "char": "玩",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "au",
+     "char": "眼",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "au",
+     "char": "岩",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "a.h",
+     "char": "頑",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "aa.h",
+     "char": "汗",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "a~m",
+     "char": "焐",
+     "group": "uniSiddham"
+    }
+   ]
+  },
+  {
+   "id": "consonant",
+   "entries": [
+    {
+     "code": "ka",
+     "char": "𑖎",
+     "group": "siddham"
+    },
+    {
+     "code": "kha",
+     "char": "𑖏",
+     "group": "siddham"
+    },
+    {
+     "code": "ga",
+     "char": "𑖐",
+     "group": "siddham"
+    },
+    {
+     "code": "gha",
+     "char": "𑖑",
+     "group": "siddham"
+    },
+    {
+     "code": ";na",
+     "char": "𑖒",
+     "group": "siddham"
+    },
+    {
+     "code": "ca",
+     "char": "𑖓",
+     "group": "siddham"
+    },
+    {
+     "code": "cha",
+     "char": "𑖔",
+     "group": "siddham"
+    },
+    {
+     "code": "ja",
+     "char": "𑖕",
+     "group": "siddham"
+    },
+    {
+     "code": "jha",
+     "char": "𑖖",
+     "group": "siddham"
+    },
+    {
+     "code": "~na",
+     "char": "𑖗",
+     "group": "siddham"
+    },
+    {
+     "code": ".ta",
+     "char": "𑖘",
+     "group": "siddham"
+    },
+    {
+     "code": ".tha",
+     "char": "𑖙",
+     "group": "siddham"
+    },
+    {
+     "code": ".da",
+     "char": "𑖚",
+     "group": "siddham"
+    },
+    {
+     "code": ".dha",
+     "char": "𑖛",
+     "group": "siddham"
+    },
+    {
+     "code": ".na",
+     "char": "𑖜",
+     "group": "siddham"
+    },
+    {
+     "code": "ta",
+     "char": "𑖝",
+     "group": "siddham"
+    },
+    {
+     "code": "tha",
+     "char": "𑖞",
+     "group": "siddham"
+    },
+    {
+     "code": "da",
+     "char": "𑖟",
+     "group": "siddham"
+    },
+    {
+     "code": "dha",
+     "char": "𑖠",
+     "group": "siddham"
+    },
+    {
+     "code": "na",
+     "char": "𑖡",
+     "group": "siddham"
+    },
+    {
+     "code": "pa",
+     "char": "𑖢",
+     "group": "siddham"
+    },
+    {
+     "code": "pha",
+     "char": "𑖣",
+     "group": "siddham"
+    },
+    {
+     "code": "ba",
+     "char": "𑖤",
+     "group": "siddham"
+    },
+    {
+     "code": "bha",
+     "char": "𑖥",
+     "group": "siddham"
+    },
+    {
+     "code": "ma",
+     "char": "𑖦",
+     "group": "siddham"
+    },
+    {
+     "code": "ya",
+     "char": "𑖧",
+     "group": "siddham"
+    },
+    {
+     "code": "ra",
+     "char": "𑖨",
+     "group": "siddham"
+    },
+    {
+     "code": "la",
+     "char": "𑖩",
+     "group": "siddham"
+    },
+    {
+     "code": "va",
+     "char": "𑖪",
+     "group": "siddham"
+    },
+    {
+     "code": ";sa",
+     "char": "𑖫",
+     "group": "siddham"
+    },
+    {
+     "code": ".sa",
+     "char": "𑖬",
+     "group": "siddham"
+    },
+    {
+     "code": "Sa",
+     "char": "𑖭",
+     "group": "siddham"
+    },
+    {
+     "code": "ha",
+     "char": "𑖮",
+     "group": "siddham"
+    },
+    {
+     "code": "lla;m",
+     "char": "𑖩𑖿𑖩𑖽",
+     "group": "siddham"
+    },
+    {
+     "code": "k.sa",
+     "char": "𑖎𑖿𑖬",
+     "group": "siddham"
+    },
+    {
+     "code": ".ta",
+     "char": "駆",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".tha",
+     "char": "駒",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ta",
+     "char": "糊",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "tha",
+     "char": "袴",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "na",
+     "char": "誇",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "lla;m",
+     "char": "希",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "pha",
+     "char": "喰",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ra",
+     "char": "貫",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "pha",
+     "char": "猘",
+     "group": "uniSiddham"
+    }
+   ]
+  },
+  {
+   "id": "variant",
+   "entries": [
+    {
+     "code": "",
+     "char": "下",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "",
+     "char": "鑑",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "",
+     "char": "還",
+     "group": "mojikyo119"
+    }
+   ]
+  },
+  {
+   "id": "symbol",
+   "entries": [
+    {
+     "code": "--",
+     "char": "𑗁",
+     "group": "siddham"
+    },
+    {
+     "code": ",,",
+     "char": "𑗂",
+     "group": "siddham"
+    },
+    {
+     "code": "..",
+     "char": "𑗃",
+     "group": "siddham"
+    },
+    {
+     "code": "*",
+     "char": "𑗄",
+     "group": "siddham"
+    },
+    {
+     "code": "|",
+     "char": "𑗅",
+     "group": "siddham"
+    },
+    {
+     "code": "||",
+     "char": "𑗉",
+     "group": "siddham"
+    },
+    {
+     "code": "2",
+     "char": "𑗆",
+     "group": "siddham"
+    },
+    {
+     "code": "@",
+     "char": "𑗇",
+     "group": "siddham"
+    },
+    {
+     "code": "=",
+     "char": "𑗈",
+     "group": "siddham"
+    },
+    {
+     "code": "*1",
+     "char": "𑗊",
+     "group": "siddham"
+    },
+    {
+     "code": "*2",
+     "char": "𑗋",
+     "group": "siddham"
+    },
+    {
+     "code": "*3",
+     "char": "𑗌",
+     "group": "siddham"
+    },
+    {
+     "code": "*4",
+     "char": "𑗍",
+     "group": "siddham"
+    },
+    {
+     "code": "*5",
+     "char": "𑗎",
+     "group": "siddham"
+    },
+    {
+     "code": "o2",
+     "char": "𑗏",
+     "group": "siddham"
+    },
+    {
+     "code": "o2x",
+     "char": "𑗐",
+     "group": "siddham"
+    },
+    {
+     "code": "ox2",
+     "char": "𑗑",
+     "group": "siddham"
+    },
+    {
+     "code": "ox3",
+     "char": "𑗒",
+     "group": "siddham"
+    },
+    {
+     "code": "ox4",
+     "char": "𑗓",
+     "group": "siddham"
+    },
+    {
+     "code": "oxx",
+     "char": "𑗔",
+     "group": "siddham"
+    },
+    {
+     "code": "*6",
+     "char": "𑗕",
+     "group": "siddham"
+    },
+    {
+     "code": "*7",
+     "char": "𑗖",
+     "group": "siddham"
+    },
+    {
+     "code": "*0",
+     "char": "𑗗",
+     "group": "siddham"
+    }
+   ]
+  },
+  {
+   "id": "bindu",
+   "entries": [
+    {
+     "code": "a",
+     "char": "𑗀",
+     "group": "siddham"
+    },
+    {
+     "code": ".h",
+     "char": "𑖾",
+     "group": "siddham"
+    },
+    {
+     "code": "aa",
+     "char": "𑖯",
+     "group": "siddham"
+    },
+    {
+     "code": "i",
+     "char": "𑖰",
+     "group": "siddham"
+    },
+    {
+     "code": "ii",
+     "char": "𑖱",
+     "group": "siddham"
+    },
+    {
+     "code": "u",
+     "char": "𑖲",
+     "group": "siddham"
+    },
+    {
+     "code": "uu",
+     "char": "𑖳",
+     "group": "siddham"
+    },
+    {
+     "code": "_uu",
+     "char": "𑗝",
+     "group": "siddham"
+    },
+    {
+     "code": ",r",
+     "char": "𑖴",
+     "group": "siddham"
+    },
+    {
+     "code": ",rr",
+     "char": "𑖵",
+     "group": "siddham"
+    },
+    {
+     "code": "e",
+     "char": "𑖸",
+     "group": "siddham"
+    },
+    {
+     "code": "ai",
+     "char": "𑖹",
+     "group": "siddham"
+    },
+    {
+     "code": "o",
+     "char": "𑖺",
+     "group": "siddham"
+    },
+    {
+     "code": "au",
+     "char": "𑖻",
+     "group": "siddham"
+    },
+    {
+     "code": "~m",
+     "char": "𑖼",
+     "group": "siddham"
+    },
+    {
+     "code": ";m",
+     "char": "𑖽",
+     "group": "siddham"
+    },
+    {
+     "code": ":-",
+     "char": "𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "_u",
+     "char": "𑗜",
+     "group": "siddham"
+    },
+    {
+     "code": "u",
+     "char": "渦",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "uu",
+     "char": "唄",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "uu",
+     "char": "鰻",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ",rr",
+     "char": "円",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "uu",
+     "char": "嘘",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ":-",
+     "char": "欝",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ":-",
+     "char": "蔚",
+     "group": "mojikyo119"
+    }
+   ]
+  },
+  {
+   "id": "ligature",
+   "entries": [
+    {
+     "code": "k",
+     "char": "𑖎𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "kh",
+     "char": "𑖏𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "g",
+     "char": "𑖐𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "gh",
+     "char": "𑖑𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ";n",
+     "char": "𑖒𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "c",
+     "char": "𑖓𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "ch",
+     "char": "𑖔𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "j",
+     "char": "𑖕𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "jh",
+     "char": "𑖖𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "~n",
+     "char": "𑖗𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".t",
+     "char": "𑖘𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".th",
+     "char": "𑖙𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".d",
+     "char": "𑖚𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".dh",
+     "char": "𑖛𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".n",
+     "char": "𑖜𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".n",
+     "char": "燠",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "t",
+     "char": "𑖝𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "th",
+     "char": "𑖞𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "d",
+     "char": "𑖟𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "dh",
+     "char": "𑖠𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "n",
+     "char": "𑖡𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "p",
+     "char": "𑖢𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "ph",
+     "char": "𑖣𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "b",
+     "char": "𑖤𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "bh",
+     "char": "𑖥𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "m",
+     "char": "𑖦𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "y",
+     "char": "𑖧𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "r",
+     "char": "𑖨𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "l",
+     "char": "𑖩𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "v",
+     "char": "𑖪𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ";s",
+     "char": "𑖫𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": ".s",
+     "char": "𑖬𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "S",
+     "char": "𑖭𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "h",
+     "char": "𑖮𑖿",
+     "group": "siddham"
+    },
+    {
+     "code": "k.s",
+     "char": "𑖎𑖿𑖬𑖿",
+     "group": "siddham"
+    }
+   ]
+  },
+  {
+   "id": "ligature_u",
+   "entries": [
+    {
+     "code": "k",
+     "char": "塩",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "k",
+     "char": "汚",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "kh",
+     "char": "甥",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "g",
+     "char": "央",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "gh",
+     "char": "往",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ";n",
+     "char": "岡",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "c",
+     "char": "荻",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ch",
+     "char": "屋",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "j",
+     "char": "臆",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "j",
+     "char": "化",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "jh",
+     "char": "伽",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "~n",
+     "char": "佳",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".t",
+     "char": "嘉",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".th",
+     "char": "嫁",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".d",
+     "char": "稼",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "~n",
+     "char": "果",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".dh",
+     "char": "花",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".n",
+     "char": "茄",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".n",
+     "char": "荷",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "t",
+     "char": "蝦",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "th",
+     "char": "臥",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "d",
+     "char": "蛾",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "dh",
+     "char": "雅",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "n",
+     "char": "介",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "n",
+     "char": "解",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "p",
+     "char": "戒",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ph",
+     "char": "改",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "b",
+     "char": "晦",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "bh",
+     "char": "海",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "m",
+     "char": "界",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "y",
+     "char": "害",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "r",
+     "char": "概",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "l",
+     "char": "碍",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "v",
+     "char": "街",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ";s",
+     "char": "鎧",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ";s",
+     "char": "各",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".s",
+     "char": "撹",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "S",
+     "char": "核",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "h",
+     "char": "獲",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "h",
+     "char": "確",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "k.s",
+     "char": "楽",
+     "group": "mojikyo119"
+    }
+   ]
+  },
+  {
+   "id": "ligature_l",
+   "entries": [
+    {
+     "code": "k",
+     "char": "於",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "k",
+     "char": "馨",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "kh",
+     "char": "凹",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "g",
+     "char": "奥",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "gh",
+     "char": "応",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ";n",
+     "char": "沖",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "c",
+     "char": "億",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ch",
+     "char": "憶",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "j",
+     "char": "桶",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "j",
+     "char": "牡",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "jh",
+     "char": "可",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "jh",
+     "char": "価",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "~n",
+     "char": "加",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".t",
+     "char": "夏",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".th",
+     "char": "家",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".d",
+     "char": "箇",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".dh",
+     "char": "苛",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".n",
+     "char": "華",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".n",
+     "char": "菓",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "t",
+     "char": "課",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "t",
+     "char": "画",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "th",
+     "char": "芽",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "d",
+     "char": "賀",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "dh",
+     "char": "餓",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "dh",
+     "char": "駕",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "n",
+     "char": "会",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "n",
+     "char": "懐",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "p",
+     "char": "拐",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "ph",
+     "char": "魁",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "b",
+     "char": "械",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "bh",
+     "char": "灰",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "m",
+     "char": "皆",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "y",
+     "char": "崖",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "y",
+     "char": "慨",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "r",
+     "char": "涯",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "l",
+     "char": "蓋",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "v",
+     "char": "該",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ";s",
+     "char": "廓",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ";s",
+     "char": "拡",
+     "group": "mojikyo119"
+    },
+    {
+     "code": ".s",
+     "char": "格",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "S",
+     "char": "殻",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "h",
+     "char": "穫",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "k.s",
+     "char": "額",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "l",
+     "char": "寡",
+     "group": "mojikyo119"
+    },
+    {
+     "code": "n",
+     "char": "回",
+     "group": "mojikyo119"
+    }
+   ]
+  }
+ ]
+}

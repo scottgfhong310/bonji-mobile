@@ -35,6 +35,7 @@ async function loadWorld() {
     css: read(path.join(APP, 'bonji-mobile.css')),
     js: read(path.join(APP, 'bonji-mobile.js')),
     libSrc: read(path.join(APP, 'bonji-mobile-lib.js')),
+    catalog: JSON.parse(read(path.join(APP, 'data', 'catalog.json'))),
     locales: {}
   };
   for (const code of ['zh-Hant', 'en', 'ja']) w.locales[code] = loadLocale(path.join(APP, 'locales', code + '.js'));
@@ -86,30 +87,38 @@ function bonjiVectors() {
   return rows.length ? rows : null;
 }
 
-// ② 記號列：每一顆有預覽的鍵都真的轉得出悉曇（沒有殘留拉丁字母 ＝ 記法對得上引擎）
-check('② 記號列的鍵都轉得出悉曇', (w) => {
+// ② 記號列的字形：catalog 的 char（owner 在 xlsx 定的）必須等於引擎轉出來的那個字（兩條路取期望值）。
+//    體文是附在子音上的符號 ⇒ 探針用 `k`＋記法、比結尾；接續直接比。
+//    ⚠️ 已知例外寫成清單、不是放寬比對：體文 `a` 在 xlsx 裡的字形是 U+115C0（nukta），而 `a` 是固有母音、
+//       引擎不畫任何符號——**那是來源資料的寫法，本 app 照原樣顯示**。清單以外的對不上一律紅。
+const GLYPH_EXCEPTIONS = { bindu: ['a'] };
+check('② 記號列字形與引擎一致', (w) => {
+  const c = new w.SiddhamConverter();
   const bad = [];
-  for (const [method, keys] of Object.entries(w.Lib.KEYSETS)) {
+  for (const id of w.Lib.KEYSET_IDS) {
+    const keys = w.Lib.keysFromCatalog(w.catalog, id);
+    if (!keys.length) { bad.push(id + ' 0 個鍵'); continue; }
     for (const k of keys) {
-      const p = w.Lib.previewOf(k);
-      if (!p) continue;
-      const s = w.SiddhamConverter.toSiddham(p.ascii, false);
-      if (!s || /[A-Za-z;.,~]/.test(s)) bad.push(method + ':' + k.ins + '→' + s);
+      if ((GLYPH_EXCEPTIONS[id] || []).includes(k.ins)) continue;
+      const out = c.convert(id === 'bindu' ? 'k' + k.ins : k.ins).siddham;
+      if (!k.glyph || !out.endsWith(k.glyph)) bad.push(id + ':' + k.ins);
     }
   }
   return bad.length ? 'FAIL: ' + bad.join(' ') : true;
 });
 
-// ③ KH 的鍵：以 KH 輸入法轉 ins，必須等於以 ISO 輸入法轉它宣稱的 iso（兩條路取期望值）
-check('③ KH 鍵與其 ISO 對應同字', (w) => {
-  const kh = new w.SiddhamConverter({ inputMethod: 'KH' });
+// ③ 插入的記法在兩種輸入法下結果相同（catalog 的 `S` 在 KH 下會變成 ṣ ⇒ 插入一律小寫）
+check('③ 記號列在 ISO／KH 下同字', (w) => {
   const iso = new w.SiddhamConverter({ inputMethod: 'ISO15919' });
-  const bad = w.Lib.KEYSETS.KH.filter((k) => k.iso).filter((k) => {
-    const tail = k.kind === 'cons' ? 'a' : '';
-    const head = k.kind === 'sign' ? 'ka' : '';
-    return kh.convert(head + k.ins + tail).siddham !== iso.convert(head + k.iso + tail).siddham;
-  });
-  return bad.length ? 'FAIL: ' + bad.map((k) => k.ins + '≠' + k.iso).join(' ') : true;
+  const kh = new w.SiddhamConverter({ inputMethod: 'KH' });
+  const bad = [];
+  for (const id of w.Lib.KEYSET_IDS) {
+    for (const k of w.Lib.keysFromCatalog(w.catalog, id)) {
+      const probe = id === 'bindu' ? 'k' + k.ins : k.ins;
+      if (iso.convert(probe).siddham !== kh.convert(probe).siddham) bad.push(id + ':' + k.ins);
+    }
+  }
+  return bad.length ? 'FAIL: ' + bad.join(' ') : true;
 });
 
 // ④ insertAt：取代選取範圍、游標落在插入文字之後、索引夾回範圍
@@ -187,10 +196,11 @@ check('⑩ 控制項字級 ≥ 16px', (w) => {
 });
 
 // ⑪ 按記號鍵／清除鈕不可以讓輸入框失焦（mousedown 的預設動作就是搬焦點）
-check('⑪ 記號列與清除鈕擋掉 mousedown', (w) => {
+check('⑪ 記號列／清除鈕／切換鈕擋掉 mousedown', (w) => {
   const kb = /\$keybar\.addEventListener\('mousedown',[\s\S]{0,120}preventDefault\(\)/.test(w.js);
   const cl = /clearBtn\.addEventListener\('mousedown',[^\n]*preventDefault\(\)/.test(w.js);
-  return (kb && cl) || 'FAIL: ' + (!kb ? '記號列 ' : '') + (!cl ? '清除鈕' : '');
+  const ks = /keysetBtn\.addEventListener\('mousedown',[^\n]*preventDefault\(\)/.test(w.js);
+  return (kb && cl && ks) || 'FAIL: ' + (!kb ? '記號列 ' : '') + (!cl ? '清除鈕 ' : '') + (!ks ? '切換鈕' : '');
 });
 
 // ⑫ 觸控裝置用原生 select、不用 .materialize-textarea（兩者在手機上各有一個安靜的壞法）
@@ -217,8 +227,9 @@ check('⑭ i18n key 齊全', (w) => {
   const dict = w.locales['zh-Hant'];
   const used = new Set();
   for (const m of w.html.matchAll(/data-i18n(?:-html|-title|-placeholder|-doctitle)?="([^"]+)"/g)) used.add(m[1]);
-  for (const m of w.js.matchAll(/I18n\.t\('([^']+)'/g)) used.add(m[1]);
+  for (const m of w.js.matchAll(/I18n\.t\('([^']+)'\s*[,)]/g)) used.add(m[1]);   // 只收完整字面值；'keyset.' + x 這種前綴另列於下
   used.add('tool.more');   // side-tool.js 動態產生 #setting-more 時掛的（DESIGN_GUIDELINES §6）
+  for (const id of w.Lib.KEYSET_IDS) used.add('keyset.' + id);   // I18n.t('keyset.' + state.keyset)
   const miss = [...used].filter((k) => !(k in dict));
   return miss.length ? 'FAIL: 未定義 ' + miss.join(', ') : true;
 });
@@ -261,7 +272,8 @@ check('⑱ 複製件 md5', () => {
   const pairs = [
     ...['side-tool.css', 'side-tool.js', 'i18n.js', 'materialize-dark.css'].map((f) => [path.join(FAMILY, f), f]),
     ...['siddham-converter.js', 'vendor/bonji-input/siddham.js', 'vendor/bonji-input/LICENSE',
-      'vendor/bonji-input/SOURCE.md', 'fonts/NotoSansSiddham-Regular.woff2', 'fonts/OFL.txt']
+      'vendor/bonji-input/SOURCE.md', 'fonts/NotoSansSiddham-Regular.woff2', 'fonts/OFL.txt',
+      'data/catalog.json']
       .map((f) => [path.join(BONJI, f), f])
   ];
   if (!fs.existsSync(FAMILY) || !fs.existsSync(BONJI)) return SKIP;
@@ -273,6 +285,24 @@ check('⑱ 複製件 md5', () => {
 check('⑲ 不直接 import 引擎', (w) => {
   const bad = /vendor\/bonji-input/.test(w.js.replace(/^\s*(\*|\/\/).*$/gm, '')) || /vendor\/bonji-input/.test(w.libSrc.replace(/^\s*(\*|\/\/).*$/gm, ''));
   return !bad || 'FAIL';
+});
+
+// ⑳ 上緣安全區由外殼墊、不由頁首墊〔owner 2026-10-08，Claude App 裡標題被遮約 75%〕：
+//    頁首是 height:48px ＋ border-box，墊在它身上會被吃進那 48px（標題只往下移一半）。
+check('⑳ 安全區墊在外殼上', (w) => {
+  const shell = /\.shell\s*\{[^}]*padding-top:\s*env\(safe-area-inset-top/.test(w.css);
+  // ⚠️ 錨在行首：檔案裡第一個 `.topbar {` 是 `body.kb-open .topbar { display:none }`，不錨的話這條會去看那一條而永遠綠（selftest 抓到的）
+  const topbar = (w.css.match(/^\.topbar\s*\{[^}]*\}/m) || [''])[0];
+  if (!topbar) return 'FAIL: 找不到 .topbar 規則';
+  const toast = /#toast-container\s*\{[^}]*top:[^;]*safe-area-inset-top/.test(w.css);
+  return (shell && !/safe-area-inset-top/.test(topbar) && toast) || 'FAIL: ' + (!shell ? '外殼沒墊 ' : '') + (/safe-area-inset-top/.test(topbar) ? '頁首又墊了 ' : '') + (!toast ? 'toast 沒讓開' : '');
+});
+
+// ㉑ 體文／接續切換鈕在清除鈕的右邊（owner 指定的位置），且兩者都在輸入列裡
+check('㉑ 切換鈕在清除鈕右邊', (w) => {
+  const bar = (w.html.match(/<div class="in-bar">[\s\S]*?<\/div>/) || [''])[0];
+  const a = bar.indexOf('id="bm-input"'), b = bar.indexOf('id="clear-input"'), c = bar.indexOf('id="keyset-toggle"');
+  return (a >= 0 && a < b && b < c) || 'FAIL: in-bar 內的順序不是 輸入 → 清除 → 切換';
 });
 
 /* ---------- 工具 ---------- */
@@ -300,8 +330,9 @@ async function run(world, quiet) {
 /* ---------- 反向驗證：每一種改壞都必須讓指定的那一條 FAIL ---------- */
 const MUTANTS = [
   ['①', '轉換結果被改', (w) => { const C = w.SiddhamConverter; w.SiddhamConverter = class extends C { convert(i) { const r = super.convert(i); return Object.assign({}, r, { latin: r.latin.toUpperCase() }); } }; }],
-  ['②', '記號列的記法打錯', (w) => { w.Lib.KEYSETS.ISO15919[0] = { ins: ';q', kind: 'sign' }; }],
-  ['③', 'KH 鍵對錯 ISO', (w) => { w.Lib.KEYSETS.KH[0] = { ins: 'M', iso: '.h', kind: 'sign' }; }],
+  ['②', 'catalog 的接續字形錯一格', (w) => { const e = w.catalog.categories.find((c) => c.id === 'ligature').entries.find((x) => x.group === 'siddham'); e.char = '𑖏𑖿'; }],
+  ['②', '例外清單以外的體文對不上', (w) => { const e = w.catalog.categories.find((c) => c.id === 'bindu').entries.find((x) => x.code === 'aa'); e.char = '𑖰'; }],
+  ['③', '插入不轉小寫（S 在 KH 下變 ṣ）', (w) => { const f = w.Lib.keysFromCatalog; w.Lib.keysFromCatalog = (cat, id) => f(cat, id).map((k) => k.ins === 's' ? { ins: 'S', glyph: k.glyph } : k); }],
   ['④', 'insertAt 游標算錯', (w) => { const f = w.Lib.insertAt; w.Lib.insertAt = (...a) => { const r = f(...a); return { value: r.value, caret: r.caret - 1 }; }; }],
   ['⑤', 'shellBox 忽略 offsetTop', (w) => { const f = w.Lib.shellBox; w.Lib.shellBox = (m) => { const r = f(m); return r && { top: 0, height: r.height }; }; }],
   ['⑥', '網址列收合被當成鍵盤', (w) => { w.Lib.keyboardOpen = (b, h) => b - h >= 60; }],
@@ -315,6 +346,9 @@ const MUTANTS = [
   ['⑭', '少一語的 key', (w) => { delete w.locales.ja['toast.inputCleared']; }],
   ['⑭', 'HTML 用了未定義的 key', (w) => { w.html = w.html.replace('data-i18n="opt.done"', 'data-i18n="opt.finish"'); }],
   ['⑮', '共用文案漂掉', (w) => { w.locales.en['tool.lang'] = 'Switch language'; }],
+  ['⑪', '切換鈕不擋 mousedown', (w) => { w.js = w.js.replace("keysetBtn.addEventListener('mousedown'", "keysetBtn.addEventListener('pointerup'"); }],
+  ['⑳', '安全區改回墊在頁首', (w) => { w.css = w.css.replace(/(\.topbar\s*\{[^}]*?)padding: 0 4px 0 16px;/, '$1padding: env(safe-area-inset-top, 0px) 4px 0 16px;'); }],
+  ['㉑', '切換鈕跑到清除鈕左邊', (w) => { w.html = w.html.replace('id="clear-input"', 'id="__c__"').replace('id="keyset-toggle"', 'id="clear-input"').replace('id="__c__"', 'id="keyset-toggle"'); }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 

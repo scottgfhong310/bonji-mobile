@@ -12,7 +12,7 @@
 
 - **單一畫面、整頁不捲**：悉曇與拉丁轉寫各佔一塊、各自捲動；正在往後打時自動捲到最新的字。
 - **跟著鍵盤**：鍵盤彈出時畫面縮到鍵盤上緣（iOS 以 `visualViewport`、Android 以 `interactive-widget=resizes-content`），頁首自動收起把高度讓給輸出。
-- **記號列**：`;m` `.h` `~m` `aa` `ii` `uu` `.t` `.d` `.n` `;n` `~n` `;s` `.s` `,r` 等一鍵插入，鍵上附悉曇字預覽；按鍵不會讓鍵盤收起。切到 Kyoto-Harvard 輸入法時換成 `M` `H` `A` `T`…。
+- **記號列（體文 ⇄ 接續）**：輸入框右側一顆鈕切換兩組——**體文**（`aa` `i` `;m` `.h` `~m` …）與**接續**（`k` `kh` `.t` `;s` …），一鍵插入、附悉曇字形；按鍵不會讓鍵盤收起。分類與字形來自 bonji 的 `BonjiInput.xlsx`。
 - **選項**（右上角 `tune`）：輸入法（ISO 15919 / Kyoto-Harvard）、拉丁轉寫（ISO 15919 / IAST）、忽略空格與連字號。
 - 輸出各有複製鈕；範例 chips；輸入與選項自動存成草稿（只存在你的瀏覽器）。
 - 內嵌 **Noto Sans Siddham**（SIL OFL）；三語介面（`zh-Hant` / `en` / `ja`）；light / dark 主題。

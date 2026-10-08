@@ -1,6 +1,6 @@
 # bonji-mobile — 設計決議
 
-> 版本 v1.0｜2026-10-08
+> 版本 v1.1｜2026-10-08
 
 「怎麼用」在 README，「為什麼長這樣」在這裡。家族共同規範（結構／i18n／主題／側鍵）只標引用、不重複：
 [DESIGN_GUIDELINES](https://github.com/scottgfhong310/nodeapp-webapp-family/blob/main/DESIGN_GUIDELINES.md)。
@@ -94,19 +94,32 @@
 
 ⇒ **字型只有 Noto Sans Siddham**（SIL OFL），CSS 裡**一個 `local()` 都沒有**（第 ⑯ 條）。
 
-## 6. 記號列
+## 6. 記號列（體文 ⇄ 接續）
 
-- 手機鍵盤上 `;` `.` `,` `~` 要切到符號頁才打得到，而這套記法幾乎每個字都要用 ⇒ 常用組合一鍵插入。
-- **兩套**：ISO 15919（`;m` `.h` `~m` `aa` … 加上單一的 `;` `.` `,` `~` `-`）與 Kyoto-Harvard（`M` `H` `A` `T` …），隨輸入法切換。
-  ⭐ KH 模式也吃 ISO 記法（實測五個範例在兩種輸入法下結果相同）⇒ 說明文字與範例不必跟著切。
-- 鍵上的小悉曇字由防腐層即時算出；第 ② 條驗每一顆都真的轉得出悉曇（沒有殘留拉丁字母），
-  第 ③ 條用**兩條路**驗 KH 鍵：以 KH 轉 `ins` 必須等於以 ISO 轉它宣稱的 `iso`。
-- ⚠️ **按鍵不可以讓輸入框失焦**——失焦＝鍵盤收起，打一個記號就要重新點輸入框。
-  擋的是 `mousedown`（觸控時是 touchend 之後補發的相容事件，它的預設動作就是搬焦點）；
-  **不擋 `touchstart`**，那會連記號列的橫向捲動一起擋掉。清除鈕同理（第 ⑪ 條）。
+- 手機鍵盤上 `;` `.` `,` `~` 要切到符號頁才打得到，而這套記法幾乎每個字都要用 ⇒ 一鍵插入。
+- **兩組，輸入框右側的鈕切換**〔owner 2026-10-08〕：**體文** 18 鍵（`a` `.h` `aa` `i` … `~m` `;m` `:-` `_u`，母音符號與點畫）／
+  **接續** 34 鍵（`k` `kh` `g` … `S`→`s` `h` `k.s`，子音的接續形）。鈕上的字＝記號列現在是哪一組；偏好存 `bonji-mobile-keyset`。
+  ⚠️ 位置照 owner 指定：**輸入框 → 清除 → 切換**（第 ㉑ 條）。切換鈕同樣擋 `mousedown`，正在打字時換組不收鍵盤（第 ⑪ 條）。
+- ⭐ **鍵不寫死**：分類與字形是 owner 在 `BonjiInput.xlsx` 裡定的，經 bonji 的 `data/catalog.json` 匯出；
+  本 app 的 `data/catalog.json` 是它的 **byte-identical 複製件**（第 ⑱ 條），`keysFromCatalog()` 只取 `group === 'siddham'`
+  （Unicode 悉曇；Mojikyo／Siddam 兩群手機上沒有字型）。寫死一份就是第二份真相，xlsx 改了這裡不會知道。
+  （v1.0 的記號列是寫死的兩套——ISO 15919 與 Kyoto-Harvard——已整個換掉。）
+- ⚠️ **插入的是小寫記法**：ISO 15919 的對應本來就不分大小寫，而 KH 的大寫有意義——catalog 的 `S`（舊寫法的齒音 s）
+  在 KH 下會變成 ṣ（實測 `𑖭𑖿` vs `𑖬𑖿`）。小寫之後 52 鍵在兩種輸入法下逐一相同（第 ③ 條），**記號列因此只要一套**。
+- 鍵上的字形是 catalog 的 `char`；第 ② 條拿它與引擎轉出來的字比（兩條路取期望值：xlsx 對引擎）。
+  ⚠️ **唯一的已知例外**：體文 `a` 的字形是 U+115C0（nukta），而 `a` 是固有母音、引擎不畫任何符號
+  ——那是來源資料的寫法，照原樣顯示、寫成例外清單（清單以外的對不上一律紅）。
+- 讀不到 `catalog.json` 時記號列上直接講出來（`keybar.loadFail`）——空著的記號列與「沒有這個功能」長得一樣。
+- ⚠️ **按鍵不可以讓輸入框失焦**——失焦＝鍵盤收起。擋的是 `mousedown`（觸控時是 touchend 之後補發的相容事件，
+  它的預設動作就是搬焦點）；**不擋 `touchstart`**，那會連記號列的橫向捲動一起擋掉。
 
 ## 7. 手機上的其他坑（都有對應的檢查）
 
+- **上緣安全區墊在外殼上、不是頁首**〔owner 2026-10-08，Claude App 實測「標題被上緣遮了約 75%」〕：
+  App 裡 artifact 的 `safe-area-inset-top` 約是一整個瀏海（iPhone 59px），App 的標題列就疊在那一塊上。
+  v1.0 把它寫在 `.topbar` 的 `padding-top`，而頁首是 `height:48px` ＋ `border-box` ⇒ **墊高被吃進那 48px**，標題只往下移一半。
+  外殼是 `position:fixed`，Artifacts 骨架給 `:root` 的那份 padding 碰不到它 ⇒ 改由 `.shell { padding-top: env(…) }` 墊，toast 的 `top` 一併讓開（第 ⑳ 條）。
+  preview 無法模擬 `env()`，以注入 59px 的同等樣式量：舊寫法標題字形 50–68px（被 59px 蓋掉一半），新寫法 74–92px。
 - **字級 ≥ 16px**，否則 iOS 聚焦時放大整頁；取 **20px**（`--ctl-font`），因為 Artifacts 版會被宿主等比縮小，16px 落地後小於 16 照樣放大（家族 memory `artifact-runtime-gotchas` 第 3 條）。第 ⑩ 條。
 - **輸入框關掉自動大寫／自動校正**：iOS 會把句首改成大寫——KH 的大小寫有意義（`T` ≠ `t`），自動校正會把記法改成英文單字。第 ⑬ 條。
 - **select 用系統原生**（`browser-default`）：Materialize 自製下拉在觸控裝置上會選到下一列（家族 `coffee-deposit` 實測）。

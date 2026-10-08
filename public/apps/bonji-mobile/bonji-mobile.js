@@ -18,7 +18,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
   var THEME_KEY = 'bonji-mobile-theme';
   var TOOLS_KEY = 'bonji-mobile-tools';   // 'on' | 'off'；手機上預設 off（側鍵會壓在輸出右緣）
   var DRAFT_KEY = 'bonji-mobile-draft';   // { input, options }（BonjiMobileLib.normalizeDraft）
-  var DOTTED = '◌';                  // ◌ 承載結合記號（同 bonji 的對照表）
+  var KEYSET_KEY = 'bonji-mobile-keyset'; // 'bindu' | 'ligature'：記號列現在是哪一組
 
   var converter = new SiddhamConverter();
   var setIconDone = window.SideTool.setIconDone;
@@ -34,7 +34,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     latin: document.getElementById('out-latin')
   };
 
-  var state = { theme: 'dark', baseline: 0, saveTimer: 0, renderedMethod: null };
+  var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'bindu', catalog: null, catalogFailed: false };
 
   /* ---------- 外殼：貼齊可見範圍 ----------
    * iOS Safari 鍵盤彈出時不縮 layout viewport、而且會把頁面往上推；只有 visualViewport
@@ -113,23 +113,40 @@ import { SiddhamConverter } from "./siddham-converter.js";
     saveDraftSoon();
   }
 
-  /* ---------- 記號列 ---------- */
+  /* ---------- 記號列（體文 ⇄ 接續） ----------
+   * 鍵由 data/catalog.json 推出（bonji 的複製件；分類與字形是 owner 在 BonjiInput.xlsx 定的）。
+   * 讀不到就在記號列上講出來——空著的記號列與「這支 app 沒有這個功能」長得一樣。 */
+  function loadCatalog() {
+    return fetch('./data/catalog.json', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (c) { state.catalog = c; })
+      .catch(function (e) {
+        console.error('catalog.json 讀取失敗：', e);
+        state.catalogFailed = true;
+      });
+  }
+
   function renderKeybar() {
-    var method = $inputMethod.value;
-    if (state.renderedMethod === method) return;
-    state.renderedMethod = method;
     $keybar.textContent = '';
-    Lib.keysFor(method).forEach(function (k) {
+    var keys = Lib.keysFromCatalog(state.catalog, state.keyset);
+    if (!keys.length) {
+      if (!state.catalog && !state.catalogFailed) return;   // 還在讀
+      var note = document.createElement('span');
+      note.className = 'keybar-note';
+      note.textContent = I18n.t('keybar.loadFail');
+      $keybar.appendChild(note);
+      return;
+    }
+    keys.forEach(function (k) {
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'key' + (k.kind === 'punct' ? ' key-punct' : '');
+      b.className = 'key';
       b.setAttribute('data-ins', k.ins);
       b.setAttribute('aria-label', k.ins);
-      var p = Lib.previewOf(k);
-      if (p) {
+      if (k.glyph) {
         var g = document.createElement('span');
         g.className = 'key-glyph';
-        g.textContent = (p.dotted ? DOTTED : '') + SiddhamConverter.toSiddham(p.ascii, false);
+        g.textContent = k.glyph;
         b.appendChild(g);
       }
       var s = document.createElement('span');
@@ -139,6 +156,25 @@ import { SiddhamConverter } from "./siddham-converter.js";
       $keybar.appendChild(b);
     });
     $keybar.scrollLeft = 0;
+  }
+
+  // 鈕上的字＝記號列現在是哪一組
+  function renderKeysetToggle() {
+    var btn = document.getElementById('keyset-toggle');
+    btn.textContent = I18n.t('keyset.' + state.keyset);
+    btn.setAttribute('data-keyset', state.keyset);
+  }
+
+  function setKeyset(id) {
+    state.keyset = Lib.normalizeKeyset(id);
+    try { localStorage.setItem(KEYSET_KEY, state.keyset); } catch (e) {}
+    renderKeysetToggle();
+    renderKeybar();
+  }
+
+  function toggleKeyset() {
+    var ids = Lib.KEYSET_IDS;
+    setKeyset(ids[(ids.indexOf(state.keyset) + 1) % ids.length]);
   }
 
   function bindKeybar() {
@@ -271,7 +307,6 @@ import { SiddhamConverter } from "./siddham-converter.js";
 
     [$inputMethod, $translit, $ignoreSpaces].forEach(function (el) {
       el.addEventListener('change', function () {
-        renderKeybar();
         convert();
         saveDraftSoon();
       });
@@ -291,6 +326,15 @@ import { SiddhamConverter } from "./siddham-converter.js";
         e.preventDefault();
         copyOutput(btn.getAttribute('data-copy'), btn);
       });
+    });
+
+    var keysetBtn = document.getElementById('keyset-toggle');
+    // 同記號列：切換不該讓鍵盤收起來（正在打字時換一組鍵是常態）
+    keysetBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    keysetBtn.addEventListener('click', function (e) { e.preventDefault(); toggleKeyset(); });
+    document.addEventListener('i18n:changed', function () {
+      renderKeysetToggle();
+      if (!Lib.keysFromCatalog(state.catalog, state.keyset).length) renderKeybar();   // 失敗說明跟著語言走
     });
 
     var clearBtn = document.getElementById('clear-input');
@@ -361,11 +405,16 @@ import { SiddhamConverter } from "./siddham-converter.js";
     $ignoreSpaces.checked = d.options.ignoreSpacesAndHyphens;
     $input.value = d.input;
 
+    var ks = null;
+    try { ks = localStorage.getItem(KEYSET_KEY); } catch (e) {}
+    state.keyset = Lib.normalizeKeyset(ks);
+    renderKeysetToggle();
+
     bindKeybar();
     bindEvents();
-    renderKeybar();
     fitShell();
     convert();
+    loadCatalog().then(function () { renderKeybar(); fitShell(); });
   }
 
   if (document.readyState === 'loading') {
