@@ -100,10 +100,9 @@ import { SiddhamConverter } from "./siddham-converter.js";
     }
     out.siddham.textContent = r.siddham;
     out.latin.textContent = r.latin;
-    // 游標在結尾（＝正在往後打）時，兩塊輸出都捲到底，剛打的字才看得到
+    // 游標在結尾（＝正在往後打）時，兩塊輸出都捲到底，剛打的字才看得到（捲的是外層 .out-value）
     if ($input.selectionEnd === input.length) {
-      out.siddham.scrollTop = out.siddham.scrollHeight;
-      out.latin.scrollTop = out.latin.scrollHeight;
+      [out.siddham, out.latin].forEach(function (el) { var box = el.parentNode; box.scrollTop = box.scrollHeight; });
     }
   }
 

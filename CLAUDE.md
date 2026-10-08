@@ -11,8 +11,8 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 21 條契約檢查
-node scripts/verify.js --selftest        # 21 個反向注入，全部必須被抓到
+npm run verify                           # 22 條契約檢查
+node scripts/verify.js --selftest        # 25 個反向注入，全部必須被抓到
 python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控）
 ```
 
@@ -42,7 +42,8 @@ public/apps/bonji-mobile/
 5. **轉換核心改 bonji 不改這裡**：`siddham-converter.js`／`vendor/`／Noto 字型都是 bonji 的 byte-identical 複製件（第 ⑱ 條）。
 6. **記號列的鍵不要寫死**：由 `data/catalog.json`（owner 的 xlsx）推出，插入一律小寫（KH 下 `S` 會變 ṣ；第 ②③ 條）。
 7. **上緣安全區墊在 `.shell` 上，不要墊在 `.topbar`**——Claude App 裡會被吃進頁首的 48px，標題被遮（第 ⑳ 條）。
-8. **不要加 `local()` 字型**：手機上沒有 Mojikyo／Siddam，會畫成一般漢字而看起來正常（DESIGN §5，第 ⑯ 條）。
+8. **Claude App 裡鍵盤彈出時 iframe 不縮、整頁被往上推**：輸出區上緣會被 App 標題列蓋住 ⇒ 悉曇｜拉丁**左右並排 2:1、文字靠底**；底部安全區以**焦點**判斷、不靠高度（第 ㉒ 條，DESIGN §3.2）。
+9. **不要加 `local()` 字型**：手機上沒有 Mojikyo／Siddam，會畫成一般漢字而看起來正常（DESIGN §5，第 ⑯ 條）。
 
 ## 複製件登記
 

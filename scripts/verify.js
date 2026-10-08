@@ -305,6 +305,22 @@ check('㉑ 切換鈕在清除鈕右邊', (w) => {
   return (a >= 0 && a < b && b < c) || 'FAIL: in-bar 內的順序不是 輸入 → 清除 → 切換';
 });
 
+// ㉒ Claude App 裡鍵盤彈出時頁面被往上推、iframe 不縮〔owner 2026-10-08 截圖〕：
+//    (a) 悉曇與拉丁轉寫左右並排、2:1 寫進 flex-basis；(b) 文字靠底（margin-top:auto，不是 justify-content:flex-end）；
+//    (c) 輸入框有焦點時外殼不墊底部安全區（高度判斷在那裡看不到鍵盤）。
+check('㉒ 並排 2:1／文字靠底／聚焦不墊底', (w) => {
+  const miss = [];
+  if (!/\.out-pane\s*\{[^}]*flex-direction:\s*row/.test(w.css)) miss.push('out-pane 不是 row');
+  if (!/\.out-block-siddham\s*\{[^}]*flex:\s*0 0 calc\(\(100% - 8px\) \* 2 \/ 3\)/.test(w.css)) miss.push('悉曇不是 2/3 basis');
+  if (!/^\.out-text\s*\{[^}]*margin-top:\s*auto/m.test(w.css)) miss.push('文字沒靠底');
+  if (/justify-content:\s*flex-end/.test((w.css.match(/^\.out-value\s*\{[^}]*\}/m) || [''])[0])) miss.push('用了 flex-end（溢出的上半截會捲不上去）');
+  if (!/\.shell:has\(#bm-input:focus\)\s*\{[^}]*padding-bottom:\s*0/.test(w.css)) miss.push('聚焦時仍墊底部安全區');
+  const so = w.html.match(/class="out-value"><div id="out-siddham" class="out-text/);
+  const lo = w.html.match(/class="out-value"><div id="out-latin" class="out-text/);
+  if (!so || !lo) miss.push('輸出文字不在 .out-value 裡的 .out-text');
+  return miss.length ? 'FAIL: ' + miss.join('、') : true;
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -349,6 +365,10 @@ const MUTANTS = [
   ['⑪', '切換鈕不擋 mousedown', (w) => { w.js = w.js.replace("keysetBtn.addEventListener('mousedown'", "keysetBtn.addEventListener('pointerup'"); }],
   ['⑳', '安全區改回墊在頁首', (w) => { w.css = w.css.replace(/(\.topbar\s*\{[^}]*?)padding: 0 4px 0 16px;/, '$1padding: env(safe-area-inset-top, 0px) 4px 0 16px;'); }],
   ['㉑', '切換鈕跑到清除鈕左邊', (w) => { w.html = w.html.replace('id="clear-input"', 'id="__c__"').replace('id="keyset-toggle"', 'id="clear-input"').replace('id="__c__"', 'id="keyset-toggle"'); }],
+  ['㉒', '改回上下排', (w) => { w.css = w.css.replace(/(\.out-pane\s*\{[^}]*flex-direction:\s*)row/, '$1column'); }],
+  ['㉒', '比例寫成 grow 2:1', (w) => { w.css = w.css.replace('flex: 0 0 calc((100% - 8px) * 2 / 3)', 'flex: 2 1 0'); }],
+  ['㉒', '文字不靠底', (w) => { w.css = w.css.replace(/(^\.out-text\s*\{[^}]*?)margin-top:\s*auto;/m, '$1'); }],
+  ['㉒', '聚焦時仍墊底部安全區', (w) => { w.css = w.css.replace('.shell:has(#bm-input:focus) { padding-bottom: 0; }', ''); }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 

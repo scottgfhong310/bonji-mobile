@@ -101,6 +101,11 @@ body {
 
 /* 鍵盤開著時：底部安全區由鍵盤蓋掉了、頁首收起把高度讓給輸出 */
 body.kb-open .shell { padding-bottom: 0; }
+/* ⚠️ 輸入框有焦點＝鍵盤開著（觸控裝置）⇒ 底部安全區不墊〔owner 2026-10-08，Claude App 實測〕：
+ *    App 裡鍵盤彈出時 **iframe 不縮、而是整頁被往上推**，visualViewport 看不到變化，kb-open 判斷不成立
+ *    ⇒ 輸入列與鍵盤之間留著約 34pt 的安全區（截圖量到 32pt）。改以焦點判斷，不靠高度。
+ *    桌機上 safe-area-inset-bottom 本來就是 0，這條是 no-op。 */
+.shell:has(#bm-input:focus) { padding-bottom: 0; }
 body.kb-open .topbar { display: none; }
 
 /* ===== 頁首 ===== */
@@ -144,11 +149,13 @@ body.kb-open .topbar { display: none; }
 .topbar-btn.active { color: var(--accent); }
 
 /* ===== 輸出區 ===== */
+/* 悉曇與拉丁轉寫**左右並排、寬 2:1**〔owner 2026-10-08〕：Claude App 裡鍵盤彈出時頁面被往上推，
+ * 輸出區的上半截會落到 App 標題列底下——上下排的話悉曇整塊看不見（截圖實況），並排則兩欄都露出下半截。 */
 .out-pane {
   flex: 1 1 auto;
   min-height: 0;                /* 讓子項可以縮到比內容小（否則 flex 子項的下限是內容高） */
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
   padding: 4px 12px 8px;
 }
@@ -163,9 +170,11 @@ body.kb-open .topbar { display: none; }
   padding: 4px 12px 8px;
   box-sizing: border-box;
 }
-/* 比例寫進 flex-basis（不寫成 3:2 的 grow）：basis 0 時內距會把小的那塊墊到地板，比例就不是那兩個數字 */
-.out-block-siddham { flex: 1 1 60%; }
-.out-block-latin { flex: 1 1 40%; }
+/* 2:1 寫進 flex-basis（不寫成 2:1 的 grow）：兩塊的內距與框線相同，grow 只分剩下的寬度，
+ * 外框比例就不是那兩個數字（實算 375px 寬時 grow 2:1 ＝ 1.78:1）。8px ＝ .out-pane 的 gap。 */
+.out-block { min-width: 0; }
+.out-block-siddham { flex: 0 0 calc((100% - 8px) * 2 / 3); }
+.out-block-latin { flex: 1 1 0; }
 
 .out-head {
   flex: none;
@@ -185,6 +194,13 @@ body.kb-open .topbar { display: none; }
   min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+/* 文字靠底：短的時候貼著記號列（頁面被往上推時，上緣那一截可能看不到）；長的時候照常捲動。
+ * ⚠️ 用 margin-top:auto 而不是 justify-content:flex-end——後者在捲動容器裡會讓溢出的上半截捲不上去。 */
+.out-text {
+  margin-top: auto;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -193,6 +209,8 @@ body.kb-open .topbar { display: none; }
   font-family: var(--siddham-font);
   font-size: 2rem;
   line-height: 1.7;
+  /* 悉曇的下接續／母音符號會畫出行盒之外（實測溢出 4px）⇒ 內容很短也冒出一條捲軸；留一點底吸收 */
+  padding-bottom: .3em;
 }
 
 .latin-text {
