@@ -306,7 +306,10 @@ code {
 
 .key-glyph {
   font-family: var(--siddham-font);
-  font-size: 1.05rem;
+  /* 以 px 指定、與下面 CBETA 完整字母的 SVG 高度同一個數字：兩邊的**墨水高**都約 18px〔owner 2026-10-09 截圖：CBETA 太大、Noto 太小〕。
+   * 實測：Noto 墨水高 ≈ 字號的 0.95（14.7px 時 14px）、CBETA 完整字母 ≈ 方框的 0.94（22px 時 21px）。
+   * ⚠️ 不用 rem：Materialize 依螢幕寬度改根字級（14／15／16px），而 SVG 高度是 px ⇒ 用 rem 兩邊會在不同寬度下錯開。 */
+  font-size: 19px;
   line-height: 1.1;
   color: inherit;               /* 裸 span 會被 materialize-dark 的 --mz-text 蓋掉（§5.1 gotcha） */
 }
@@ -321,8 +324,8 @@ code {
   fill: currentColor;
 }
 /* catalog 接續的 CBETA 字形是**完整字母**（撐滿 em 方框），畫成 30px 會比旁邊的 Noto 字大一號、頂到鍵的上緣（實測）
- * ⇒ 縮到與 Noto 字同大；上／下接續是部件，仍用整個 30px 方框（部件的上下位置就是資訊）。 */
-.keybar .key-cbeta-whole .key-svg { height: 22px; }
+ * ⇒ 縮到與 Noto 字同大（墨水高對齊，見 .key-glyph）；上／下接續是部件，仍用整個 30px 方框（部件的上下位置就是資訊）。 */
+.keybar .key-cbeta-whole .key-svg { height: 19px; }   /* 與 .key-glyph 的 19px 同一個數字，理由見那裡 */
 .key-ins {
   font-family: var(--mono-font);
   font-size: .85rem;

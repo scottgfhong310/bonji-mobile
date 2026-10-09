@@ -11,8 +11,8 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 27 條契約檢查
-node scripts/verify.js --selftest        # 36 個反向注入，全部必須被抓到
+npm run verify                           # 28 條契約檢查
+node scripts/verify.js --selftest        # 38 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
 python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）
 ```

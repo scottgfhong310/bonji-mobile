@@ -404,6 +404,17 @@ check('㉗ 接續的 CBETA 字形接在指定的鍵之後', (w) => {
   return bad.length ? 'FAIL: ' + bad.join('；') : true;
 });
 
+// ㉘ Noto 字形與 CBETA 完整字母在鍵上同大〔owner 2026-10-09 截圖：CBETA 太大、Noto 太小〕：
+//    兩者的墨水高都約是各自尺寸的 0.95，所以 `.key-glyph` 的字號與 `.key-cbeta-whole .key-svg` 的高度要是**同一個 px 數**，
+//    而且都用 px（Materialize 依螢幕寬度改根字級，rem 會讓兩邊在不同寬度下錯開）。實測接續組墨水高 18.1／18.5px。
+check('㉘ Noto 與 CBETA 完整字母同大', (w) => {
+  const g = (w.css.match(/^\.key-glyph\s*\{[^}]*?font-size:\s*([\d.]+)(px|rem|em)/m) || []);
+  const c = (w.css.match(/\.key-cbeta-whole \.key-svg\s*\{\s*height:\s*([\d.]+)(px|rem|em)/) || []);
+  if (!g[1] || !c[1]) return 'FAIL: 找不到 .key-glyph 的字號或 .key-cbeta-whole .key-svg 的高度';
+  if (g[2] !== 'px' || c[2] !== 'px') return 'FAIL: 要用 px（' + g[2] + '／' + c[2] + '）';
+  return g[1] === c[1] || 'FAIL: 字號 ' + g[1] + 'px ≠ SVG 高 ' + c[1] + 'px';
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -464,6 +475,8 @@ const MUTANTS = [
   ['㉗', '盷 寫回清單上的 .th', (w) => { w.catalog.categories.find((c) => c.id === 'ligature').entries.find((e) => e.char === '盷').code = '.th'; }],
   ['㉗', '祋 排到 k.s 之後', (w) => { const es = w.catalog.categories.find((c) => c.id === 'ligature').entries; const i = es.findIndex((e) => e.char === '祋'); const [x] = es.splice(i, 1); es.push(x); }],
   ['㉗', '母音的 焐 也被收進記號列（白名單失效）', (w) => { w.Lib.CATALOG_CBETA_SETS.vowel = true; const v = w.catalog.categories.find((c) => c.id === 'vowel').entries.find((e) => e.group === 'uniSiddham'); const l = w.catalog.categories.find((c) => c.id === 'ligature'); l.entries.push(Object.assign({}, v)); }],
+  ['㉘', 'Noto 字號改回 1.05rem', (w) => { w.css = w.css.replace(/(^\.key-glyph\s*\{[^}]*?font-size:\s*)19px/m, '$11.05rem'); }],
+  ['㉘', 'CBETA 完整字母改回 22px', (w) => { w.css = w.css.replace('.key-cbeta-whole .key-svg { height: 19px; }', '.key-cbeta-whole .key-svg { height: 22px; }'); }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 

@@ -179,7 +179,9 @@ WebKit bug 200627）。⚠️ 來源是 2016–2022 年的，未在現行 iOS �
   ⚠️ 它們在 `db_siddham` 裡是 CBETA 的**子音**字形（完整字母），放進接續、插入去尾 `a` 的記法是 owner 的設計；
   **盷 原清單的 input 寫 `.th`（捲舌），與 after 欄 𑖞𑖿 及資料庫（齒音 tha）不符——問過 owner，裁定 `th`**。
   `CATALOG_CBETA_SETS = { ligature: true }` 是**白名單**：母音類也有一格 `uniSiddham`（`a~m` 焐），owner 沒有要它進記號列。
-  它們是完整字母、撐滿 em 方框 ⇒ 鍵上畫 22px（30px 會比旁邊的 Noto 字大一號、頂到鍵的上緣，實測）。
+  它們是完整字母、撐滿 em 方框（墨水佔方框約 94%）。**鍵上的大小以墨水高對齊 Noto**〔owner 2026-10-09 截圖：22px 時 CBETA 仍太大、Noto 太小〕：
+  兩者都用 **19px**（`.key-glyph` 字號＝`.key-cbeta-whole .key-svg` 高度，同一個數字、都用 px——rem 會隨 Materialize 的根字級在不同寬度錯開），
+  實測接續組墨水高 Noto 18.1／CBETA 18.5px（原本 14／21px）；所有組別的鍵仍 46px、無溢出。第 ㉘ 條盯著兩個數字相等。
   第 ㉗ 條以 owner 那張表當期望值（**不取自 catalog.json**），逐一驗記法與前一鍵；sprite 因此是 **89** 個 symbol（83 ＋ 6）。
 - **沒有 sprite 時**（clone 下來的那一份）：兩組鍵照樣在、照樣能插入，只印記法（實測 39 鍵、0 個 SVG、插入正常）；第 ㉖ 條回 **SKIP**（不是 PASS）。
   主控台會有一筆 404（那就是「找不到 sprite」本身），程式不報錯。
