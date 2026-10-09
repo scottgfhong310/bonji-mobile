@@ -320,6 +320,9 @@ code {
   aspect-ratio: 1 / 1;
   fill: currentColor;
 }
+/* catalog 接續的 CBETA 字形是**完整字母**（撐滿 em 方框），畫成 30px 會比旁邊的 Noto 字大一號、頂到鍵的上緣（實測）
+ * ⇒ 縮到與 Noto 字同大；上／下接續是部件，仍用整個 30px 方框（部件的上下位置就是資訊）。 */
+.keybar .key-cbeta-whole .key-svg { height: 22px; }
 .key-ins {
   font-family: var(--mono-font);
   font-size: .85rem;

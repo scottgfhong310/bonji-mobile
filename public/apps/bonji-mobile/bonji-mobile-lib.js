@@ -45,6 +45,11 @@
   // 這兩組的資料不在 catalog.json（那裡只有 Mojikyo 群），而在 element-catalog.json 的 Cbeta 群
   var ELEMENT_SETS = { ligature_u: true, ligature_l: true };
 
+  /* catalog.json 裡 `uniSiddham` 群（CBETA `Siddam` 字型）的格，只在這幾類收進記號列，鍵上畫 CBETA 字形的 SVG。
+   * 〔owner 2026-10-09：接續加 6 格 CBETA 字形（盄 眈 眄 盷 矧 祋），各自接在同音的 Unicode 那一格之後〕
+   * ⚠️ 刻意是白名單、不是「所有類別都收 uniSiddham」：母音類也有一格（`a~m` 焐），owner 沒有要它進記號列。 */
+  var CATALOG_CBETA_SETS = { ligature: true };
+
   function keysFromCatalog(catalog, id) {
     var cats = catalog && catalog.categories;
     if (!Array.isArray(cats)) return [];
@@ -53,11 +58,16 @@
     if (!cat || !Array.isArray(cat.entries)) return [];
     var seen = {}, out = [];
     cat.entries.forEach(function (e) {
-      if (!e || e.group !== 'siddham' || typeof e.code !== 'string' || !e.code) return;
+      if (!e || typeof e.code !== 'string' || !e.code || typeof e.char !== 'string') return;
+      var cbeta = e.group === 'uniSiddham' && CATALOG_CBETA_SETS[id];
+      if (e.group !== 'siddham' && !cbeta) return;
       var ins = e.code.toLowerCase();
-      if (seen[ins]) return;
-      seen[ins] = true;
-      out.push({ ins: ins, glyph: typeof e.char === 'string' ? e.char : '' });
+      // 去重的鍵是（記法, 字形）：同一個記法的 Unicode 字形與 CBETA 字形是兩顆鍵（`.t` 𑖘𑖿 與 `.t` 盄）
+      var key = ins + '|' + e.char;
+      if (seen[key]) return;
+      seen[key] = true;
+      // whole：完整字母（不是上／下接續那種部件）——控制器據此把字形畫小一點，與旁邊的 Noto 字同大
+      out.push(cbeta ? { ins: ins, cbeta: e.char, whole: true } : { ins: ins, glyph: e.char });
     });
     return out;
   }
@@ -163,6 +173,7 @@
     keysFromElements: keysFromElements,
     keysFor: keysFor,
     ELEMENT_SETS: ELEMENT_SETS,
+    CATALOG_CBETA_SETS: CATALOG_CBETA_SETS,
     normalizeKeyset: normalizeKeyset,
     insertAt: insertAt,
     shellBox: shellBox,

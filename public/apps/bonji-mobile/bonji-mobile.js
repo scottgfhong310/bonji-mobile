@@ -193,7 +193,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
         b.appendChild(g);
       } else if (k.cbeta) {
         var svg = cbetaGlyph(k.cbeta);   // 沒有 sprite（GitHub 那一份）就只印記法
-        if (svg) { b.appendChild(svg); b.classList.add('key-cbeta'); }
+        if (svg) { b.appendChild(svg); b.classList.add('key-cbeta'); if (k.whole) b.classList.add('key-cbeta-whole'); }
         b.setAttribute('title', k.ins + '（CBETA U+' + k.cbeta.codePointAt(0).toString(16).toUpperCase() + '）');
       }
       var s = document.createElement('span');

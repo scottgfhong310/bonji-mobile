@@ -13,7 +13,8 @@
    **本腳本可以公開**：它不含任何字形資料，要在本機有那支字型才跑得出東西。
 
 哪些字：`data/element-catalog.json`（bonji 的複製件，由 db_siddham 匯出）裡 Cbeta 群的
-`ligature_u`（上接續）與 `ligature_l`（下接續）——每格一個 CJK 碼位，在 Siddam 字型裡畫成悉曇部件。
+`ligature_u`（上接續）與 `ligature_l`（下接續）——每格一個 CJK 碼位，在 Siddam 字型裡畫成悉曇部件；
+另加 `data/catalog.json`（BonjiInput.xlsx）「接續」類的 `uniSiddham` 群（2026-10-09 owner 加的 6 格）。
 
 做法（Python 標準函式庫，無 fontTools）：cmap format 4 → loca／glyf（簡單字形＋複合字形）→
 TrueType 二次曲線轉 SVG path（相鄰兩個 off-curve 點之間補隱含的 on-curve 中點）。
@@ -29,11 +30,14 @@ import hashlib
 REPO = pathlib.Path(__file__).resolve().parent.parent
 APP = REPO / 'public' / 'apps' / 'bonji-mobile'
 ELEMENTS = APP / 'data' / 'element-catalog.json'
+CATALOG = APP / 'data' / 'catalog.json'
 OUT = APP / 'cbeta' / 'cbeta-ligatures.svg'
 FONT_CANDIDATES = [
     REPO.parent.parent / 'InProgress' / 'public' / 'lib' / 'fonts' / 'Siddham.ttf',   # v2.00 ＝ tb_font 的 authority
 ]
 CATS = ('ligature_u', 'ligature_l')
+# catalog.json 裡要畫成 SVG 的類（uniSiddham 群＝Siddam 字型）；與 bonji-mobile-lib.js 的 CATALOG_CBETA_SETS 同一份名單
+CATALOG_CATS = ('ligature',)
 
 
 class Font:
@@ -247,6 +251,10 @@ def main():
     for c in grp['categories']:
         if c['id'] in CATS:
             chars += [e['char'] for e in c['entries'] if e.get('char')]
+    cat = json.loads(CATALOG.read_text(encoding='utf-8'))
+    for c in cat['categories']:
+        if c['id'] in CATALOG_CATS:
+            chars += [e['char'] for e in c['entries'] if e.get('group') == 'uniSiddham' and e.get('char')]
     seen, uniq = set(), []
     for ch in chars:
         if ch not in seen:
@@ -265,7 +273,7 @@ def main():
         adv = f.advance(gid) or f.upem
         syms.append('<symbol id="cb-%x" viewBox="0 0 %d %d"><path d="%s"/></symbol>' % (ord(ch), adv, H, d))
     print('字型：%s（%s）md5 %s' % (font_path, ver, hashlib.md5(raw).hexdigest()))
-    print('上接續＋下接續：%d 格／%d 個相異字形；產出 %d 個 symbol；缺字 %d；空字形 %d'
+    print('上接續＋下接續＋catalog 接續（Siddam）：%d 格／%d 個相異字形；產出 %d 個 symbol；缺字 %d；空字形 %d'
           % (len(chars), len(uniq), len(syms), len(missing), len(empty)))
     if missing or empty:
         print('✗ 缺字：%s　空字形：%s' % (' '.join('U+%04X' % ord(c) for c in missing), ' '.join('U+%04X' % ord(c) for c in empty)))

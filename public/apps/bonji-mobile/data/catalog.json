@@ -895,9 +895,19 @@
      "group": "siddham"
     },
     {
+     "code": ".t",
+     "char": "盄",
+     "group": "uniSiddham"
+    },
+    {
      "code": ".th",
      "char": "𑖙𑖿",
      "group": "siddham"
+    },
+    {
+     "code": ".th",
+     "char": "眈",
+     "group": "uniSiddham"
     },
     {
      "code": ".d",
@@ -908,6 +918,11 @@
      "code": ".dh",
      "char": "𑖛𑖿",
      "group": "siddham"
+    },
+    {
+     "code": ".dh",
+     "char": "眄",
+     "group": "uniSiddham"
     },
     {
      "code": ".n",
@@ -930,6 +945,11 @@
      "group": "siddham"
     },
     {
+     "code": "th",
+     "char": "盷",
+     "group": "uniSiddham"
+    },
+    {
      "code": "d",
      "char": "𑖟𑖿",
      "group": "siddham"
@@ -943,6 +963,11 @@
      "code": "n",
      "char": "𑖡𑖿",
      "group": "siddham"
+    },
+    {
+     "code": "n",
+     "char": "矧",
+     "group": "uniSiddham"
     },
     {
      "code": "p",
@@ -1008,6 +1033,11 @@
      "code": "h",
      "char": "𑖮𑖿",
      "group": "siddham"
+    },
+    {
+     "code": "lla;m",
+     "char": "祋",
+     "group": "uniSiddham"
     },
     {
      "code": "k.s",

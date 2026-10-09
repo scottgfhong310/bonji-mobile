@@ -104,6 +104,7 @@ check('② 記號列字形與引擎一致', (w) => {
     const keys = w.Lib.keysFromCatalog(w.catalog, id);
     if (!keys.length) { bad.push(id + ' 0 個鍵'); continue; }
     for (const k of keys) {
+      if (k.cbeta) continue;   // CBETA 字形（catalog 的 uniSiddham 群）不是 Unicode，引擎轉不出來；由 ㉖／㉗ 另外驗
       if ((GLYPH_EXCEPTIONS[id] || []).includes(k.ins)) continue;
       const out = c.convert(id === 'bindu' ? 'k' + k.ins : k.ins).siddham;
       if (!k.glyph || !out.endsWith(k.glyph)) bad.push(id + ':' + k.ins);
@@ -369,8 +370,9 @@ check('㉕ cbeta/ 不在版控裡', () => {
 check('㉖ CBETA sprite 涵蓋上／下接續', (w) => {
   if (!w.sprite) return SKIP;
   const bad = [];
-  for (const id of ['ligature_u', 'ligature_l']) {
+  for (const id of ['ligature_u', 'ligature_l', 'ligature']) {
     for (const k of w.Lib.keysFor(w.catalog, w.elements, id)) {
+      if (!k.cbeta) continue;
       const sid = 'cb-' + k.cbeta.codePointAt(0).toString(16);
       const m = w.sprite.match(new RegExp('<symbol id="' + sid + '" viewBox="0 0 (\\d+) (\\d+)"><path d="([^"]+)"'));
       if (!m) bad.push(id + ':' + k.ins + '(' + sid + ')');
@@ -378,6 +380,28 @@ check('㉖ CBETA sprite 涵蓋上／下接續', (w) => {
     }
   }
   return bad.length ? 'FAIL: ' + bad.slice(0, 8).join(' ') : true;
+});
+
+// ㉗ 接續的 6 格 CBETA 字形，各自緊接在 owner 指定的那一鍵之後〔owner 2026-10-09 的表；盷 依 owner 裁定為 th〕。
+//    期望值寫死在這裡（取自 owner 的清單，不是取自 catalog.json）——xlsx 哪天被改動、位置或記法漂了，這一條會紅。
+const CBETA_LIGATURE_SPEC = [
+  ['盄', '.t', '𑖘𑖿'], ['眈', '.th', '𑖙𑖿'], ['眄', '.dh', '𑖛𑖿'],
+  ['盷', 'th', '𑖞𑖿'], ['矧', 'n', '𑖡𑖿'], ['祋', 'lla;m', '𑖮𑖿']
+];
+check('㉗ 接續的 CBETA 字形接在指定的鍵之後', (w) => {
+  const keys = w.Lib.keysFor(w.catalog, w.elements, 'ligature');
+  const bad = [];
+  for (const [ch, ins, after] of CBETA_LIGATURE_SPEC) {
+    const i = keys.findIndex((k) => k.cbeta === ch);
+    if (i < 0) { bad.push(ch + ' 不在接續裡'); continue; }
+    if (keys[i].ins !== ins) bad.push(ch + ' 插入 ' + keys[i].ins + '（應為 ' + ins + '）');
+    const prev = keys[i - 1];
+    if (!prev || prev.glyph !== after) bad.push(ch + ' 前一鍵是 ' + (prev ? (prev.glyph || prev.cbeta) : '（無）') + '（應為 ' + after + '）');
+  }
+  const extra = keys.filter((k) => k.cbeta && !CBETA_LIGATURE_SPEC.some((x) => x[0] === k.cbeta));
+  if (extra.length) bad.push('多出 ' + extra.map((k) => k.cbeta).join(''));
+  if (keys.length !== 40) bad.push('接續 ' + keys.length + ' 鍵（應為 34 ＋ 6）');
+  return bad.length ? 'FAIL: ' + bad.join('；') : true;
 });
 
 /* ---------- 工具 ---------- */
@@ -437,6 +461,9 @@ const MUTANTS = [
   ['㉔', '上接續被去重（少了同記法的異體）', (w) => { const f = w.Lib.keysFor; w.Lib.keysFor = (c, e, id) => { const ks = f(c, e, id); const seen = {}; return id === 'ligature_u' ? ks.filter((k) => !seen[k.ins] && (seen[k.ins] = 1)) : ks; }; }],
   ['㉔', '上下接續排到接續後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 6, 'vowel', 'variant', 'bindu', 'ligature', 'ligature_u', 'ligature_l'); }],
   ['㉖', 'sprite 少一個字形', (w) => { if (w.sprite) w.sprite = w.sprite.replace(/<symbol id="cb-65d0"[^]*?<\/symbol>/, ''); else w.sprite = '<svg></svg>'; }],
+  ['㉗', '盷 寫回清單上的 .th', (w) => { w.catalog.categories.find((c) => c.id === 'ligature').entries.find((e) => e.char === '盷').code = '.th'; }],
+  ['㉗', '祋 排到 k.s 之後', (w) => { const es = w.catalog.categories.find((c) => c.id === 'ligature').entries; const i = es.findIndex((e) => e.char === '祋'); const [x] = es.splice(i, 1); es.push(x); }],
+  ['㉗', '母音的 焐 也被收進記號列（白名單失效）', (w) => { w.Lib.CATALOG_CBETA_SETS.vowel = true; const v = w.catalog.categories.find((c) => c.id === 'vowel').entries.find((e) => e.group === 'uniSiddham'); const l = w.catalog.categories.find((c) => c.id === 'ligature'); l.entries.push(Object.assign({}, v)); }],
   ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
 ];
 
