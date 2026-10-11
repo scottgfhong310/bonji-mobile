@@ -11,6 +11,18 @@ import { ascii2latin, ascii2siddham, ascii2symbol, latin2ascii } from "./vendor/
 // 轉出後再把 sentinel 換回對應字形 / 拉丁。詳見 DESIGN §4「補充符號」。
 const DOTTED = "◌" // ◌ 點圈載體（顯示用，與對照表 §7.1 一致）
 
+// ── 三個半形空格 → 一個全形空格（只在悉曇輸出；DESIGN §5.3）────────────────────────────
+// 與補充符號同一招：先換成一個私用區 sentinel（引擎原樣 echo），轉完再換成 U+3000。
+// - 不直接換成 U+3000：它是空白字元，toSiddham 的 trim() 會把貼著邊緣的它吃掉（連相鄰的換行一起）。
+// - sentinel 兩側各墊一個 tab：引擎判斷「: 是不是字面冒號」看的是它旁邊有沒有空白（\s），
+//   不墊的話「ka:␣␣␣ma」的冒號會由字面冒號變成分隔符。墊 tab 不墊空格，是為了換回 U+3000 時
+//   收得乾淨——墊空格的話會分不出哪一個是墊的、哪一個是使用者的（或連字號補的）那個空格。
+// - 用第 15 平面的私用區，與補充符號的 U+E000… 不相撞。
+const WIDE_SPACE = "\u3000"
+const WIDE_SPACE_SENTINEL = "\u{F0000}"
+const WIDE_SPACE_PADDED = "\t" + WIDE_SPACE_SENTINEL + "\t"
+const WIDE_SPACE_PADDED_RE = /\t?\u{F0000}\t?/gu
+
 // 章節 / 裝飾符號 + virama（皆獨立、不接字）。latin 照 bonji 慣例＝悉曇字本身；
 // virama 例外：悉曇用 ◌ 載體、latin 放 ◌。
 const EXTRA_MARK = {
@@ -131,13 +143,16 @@ export class SiddhamConverter {
      *   不論 ignore 與否。拉丁轉寫則保留「-」（由 ascii2latin 處理，本函式不碰）。
      * - 空格：ignore=true 時移除「可見空格」但仍視為 token 邊界（故「n a」→𑖡𑖿𑖀＝
      *   子音+獨立母音，而非併成音節 𑖡）；ignore=false 時交給引擎保留為字面空格。
+     * - 三個空格＝一個全形空格（U+3000），不論 ignore 與否；由左而右每三個一組，剩下的一個或
+     *   兩個照上一條。它同樣是 token 邊界（「n␣␣␣a」→ 𑖡𑖿＋U+3000＋𑖀），而且不被 trim 掉（行首可
+     *   用來縮排）。拉丁與 ascii 不在這裡處理、照舊保留那三個空格。
      *
      * @param {string} ascii
      * @param {boolean} ignore
      * @returns {string}
      */
     static toSiddham(ascii, ignore) {
-        return ascii.split(/-+/)
+        return ascii.split("   ").join(WIDE_SPACE_PADDED).split(/-+/)
             .map((group) => {
                 group = group.trim()
                 if (!group) return ""
@@ -147,6 +162,7 @@ export class SiddhamConverter {
             })
             .filter((s) => s !== "")
             .join(" ")
+            .replace(WIDE_SPACE_PADDED_RE, WIDE_SPACE)
     }
 
     /**
