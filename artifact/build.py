@@ -11,7 +11,7 @@
 ⚠️ 每一處錨點都要求**恰好命中一次**，否則 exit 1：app 那一側改了而補丁沒跟上時，
    建置會當場失敗，而不是安靜地少打一個補丁。
 
-bonji-mobile 本來就零後端，所以 Artifact 版只差兩件事：
+bonji-mobile 本來就零後端，所以 Artifact 版只差三件事：
   ① `materialize.min.css` 自己託管（vendor/）：Artifact 的 CSP 只允許 fonts.googleapis.com
      當外部樣式表來源，**cdnjs 的樣式表會被擋掉而且不報錯**（整頁沒有樣式）。
      來源 https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css（MIT），
@@ -19,6 +19,10 @@ bonji-mobile 本來就零後端，所以 Artifact 版只差兩件事：
   ② 紀錄清單的 JSON 下載：沙盒會擋掉 `<a download>`（blob: 也一樣）而且不報錯 ⇒ 改走 `downloads` capability
      （**發佈時要宣告 `capabilities: {downloads: true}`**）。拿不到就講出來，不假裝下載了；
      使用者在確認框按取消（`declined`）不是錯誤。Claude iOS App 裡「saved」＝交給系統的分享面板。
+  ③ 紀錄清單存 artifact 的資料庫（`db` capability）：iPhone 的 Claude App 把 artifact 關掉重開，localStorage 就讀不回來
+     〔owner 2026-10-11 實測〕。多帶一支 `artifact/src/remote-db.js`（只有 Artifacts 版有；一筆一份文件），
+     並在 index.html 的控制器之前載入它。app 那一側只留一個接點（`window.BonjiMobileRemote`），沒有它就照舊存 localStorage。
+     **發佈時要宣告 `db`，規則是只有 artifact 的 owner 讀寫**：見最後印出來的那一行。
   （bonji 的另外三件——backend:false、對照表換頁、不帶 xlsx——這裡都不存在。）
 
 ⚠️ 字型：只有 Noto Sans Siddham（OFL）。`verify()` 在最後擋著：dist 裡出現別的字型檔就 exit 1。
@@ -69,11 +73,18 @@ DOWNLOAD_NEW = """  function downloadText(name, text) {
     });
   }"""
 
+CONTROLLER_TAG = '  <script type="module" src="./bonji-mobile.js"></script>'
+REMOTE_TAG = '  <!-- 紀錄清單同步（只有 Artifacts 版有）：把 window.BonjiMobileRemote 掛上來 -->\n  <script src="./remote-db.js"></script>\n'
+
 # (相對路徑, 舊, 新)
 PATCHES = [
     ('index.html', CDN_CSS, LOCAL_CSS),
+    ('index.html', CONTROLLER_TAG, REMOTE_TAG + CONTROLLER_TAG),
     ('bonji-mobile.js', DOWNLOAD_OLD, DOWNLOAD_NEW),
 ]
+
+# 發佈時的 capabilities——這一行同時印在建置結尾；改這裡要連 remote-db.js 檔頭那一行一起改
+CAPABILITIES = '{"downloads": true, "db": {"rules": [{"path": "", "read": "owner", "write": "owner"}]}}'
 
 FONT_EXT = {'.ttf', '.otf', '.ttc', '.dfont', '.woff', '.woff2', '.eot'}
 FONT_ALLOWED = {'fonts/NotoSansSiddham-Regular.woff2'}
@@ -103,7 +114,8 @@ def main():
         shutil.copy2(src, dst)
         n += 1
     shutil.copy2(HERE / 'vendor' / 'materialize.min.css', out / 'materialize.min.css')
-    print('  ✓ %d 個檔 ＋ materialize.min.css' % n)
+    shutil.copy2(HERE / 'src' / 'remote-db.js', out / 'remote-db.js')
+    print('  ✓ %d 個檔 ＋ materialize.min.css ＋ remote-db.js' % n)
 
     print('② 補丁（每一處恰好命中一次）')
     for rel, old, new in PATCHES:
@@ -130,6 +142,10 @@ def main():
                 bad.append('仍引用 cdnjs 樣式表：' + rel)
             if rel == 'bonji-mobile.js' and ('a.download' in t or "claude.use('downloads')" not in t):
                 bad.append('下載仍走 <a download>（沙盒會擋掉且不報錯）：' + rel)
+            if rel == 'bonji-mobile.js' and 'BonjiMobileRemote' not in t:
+                bad.append('控制器沒有同步的接點（window.BonjiMobileRemote）：' + rel)
+            if rel == 'index.html' and t.find('./remote-db.js') < 0:
+                bad.append('index.html 沒有載入 remote-db.js（清單會只存在瀏覽器裡，iPhone 上關掉就沒了）')
     sprite = out / 'cbeta' / 'cbeta-ligatures.svg'
     if '--no-cbeta' in sys.argv:
         if sprite.exists():
@@ -145,7 +161,8 @@ def main():
         return 1
     print('  ✓ 沒有 Noto 以外的字型、沒有 cdnjs 樣式表')
 
-    print('\n✓ 建置完成。發佈時宣告 capabilities: {downloads: true}（紀錄清單的 JSON 下載）。')
+    print('\n✓ 建置完成。發佈時宣告 capabilities: ' + CAPABILITIES)
+    print('  ⚠️ 發佈之前先備份資料庫裡的清單（ArtifactData list `records` ＋ get `state/title`），見 CLAUDE.md。')
     return 0
 
 

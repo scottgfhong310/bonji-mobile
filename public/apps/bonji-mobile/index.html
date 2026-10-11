@@ -179,7 +179,8 @@
 
       <div class="rec-heading"><h3>JSON</h3></div>
       <pre id="rec-json" class="rec-json mono"></pre>
-      <p class="rec-note" data-i18n="rec.note">清單只存在這支瀏覽器裡，不是備份；要留存請複製或下載 JSON。</p>
+      <!-- 清單現在存在哪裡（這支瀏覽器／artifact 的資料庫／連不上）：文字由 bonji-mobile.js 的 renderRecNote 依狀態填 -->
+      <p id="rec-note" class="rec-note"></p>
     </div>
     <div class="modal-footer">
       <a href="#!" id="rec-copy" class="btn-flat"><i class="material-icons left">content_copy</i><span data-i18n="rec.copyJson">複製 JSON</span></a>

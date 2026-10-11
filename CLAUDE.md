@@ -11,10 +11,10 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 34 條契約檢查
-node scripts/verify.js --selftest        # 64 個反向注入，全部必須被抓到
+npm run verify                           # 35 條契約檢查
+node scripts/verify.js --selftest        # 71 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
-python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時宣告 capabilities {downloads: true}
+python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時的 capabilities 見建置結尾印出的那一行（downloads ＋ db）
 ```
 
 ## 結構
@@ -23,6 +23,7 @@ python3 artifact/build.py                # Artifacts 版 → artifact/dist/（�
 app.js                                   # 只有 static ＋ / → 302 ＋ JSON 404（無 API）
 scripts/verify.js                        # 契約檢查 ＋ --selftest
 artifact/{build.py, vendor/materialize.min.css}   # Artifacts 版建置（差異全在 PATCHES）
+artifact/src/remote-db.js                # ⚠️ 只有 Artifacts 版有：紀錄清單存 artifact 的資料庫（一筆一份文件）
 public/apps/bonji-mobile/
 ├─ index.html · bonji-mobile.css · bonji-mobile.js   # 結構 / 樣式 / 控制器（ESM）
 ├─ bonji-mobile-lib.js                   # 純核心（IIFE → window.BonjiMobileLib，不碰 DOM）：記號列／可見範圍／草稿／**紀錄清單與 JSON 輸出**
@@ -54,7 +55,10 @@ public/apps/bonji-mobile/
 14. ⚠️⚠️ **改標題的路上不可以有任何一行寫清單**〔2026-10-11 實際弄丟過 owner 的紀錄〕：標題存 `bonji-mobile-rec-title`、清單存 `bonji-mobile-records`，**兩格分開、各自只在自己被改時寫**；
     會寫清單的只有 `addCurrent`／`recAction`，而且都先 `syncItems()`（別的畫面改過就以儲存區為準）。**不要為了省事加一支「整份存檔」**——
     一個比較舊的畫面呼叫它一次，別處後來記的紀錄就全部被蓋掉，而畫面上什麼都不會報。第 ㉞ 條（DESIGN §10.3）。
-15. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
+15. ⚠️⚠️ **Artifacts 版的紀錄清單住在 artifact 的資料庫裡，不在 localStorage**〔owner 2026-10-11 實測：iPhone 的 Claude App 把 artifact 關掉重開，localStorage 就讀不回來〕。
+    `artifact/src/remote-db.js`（`window.BonjiMobileRemote`）：`records/<id>` **一筆一份文件**、`state/title` 一份。**不要改成「整份清單一份文件」**——那就是第 14 條的整格重寫。
+    GitHub／3001 那一份沒有它，照舊存 localStorage（第 ㉟ 條，DESIGN §10.4）。
+16. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
 
 ## 複製件登記
 
@@ -68,4 +72,13 @@ public/apps/bonji-mobile/
 
 ## Claude Artifacts 版
 
-<https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG>（private）。**改了前端要更新**：重跑 `build.py`，再以 Artifact 工具帶 `url` 重新發佈 `artifact/dist/` 整包（先 `read` 一次），**宣告 `capabilities: {downloads: true}`**（紀錄清單的 JSON 下載；沙盒會擋掉 `<a download>`）。
+<https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG>（private）。**改了前端要更新**，順序固定：
+
+1. ⚠️ **先備份資料庫裡的清單**〔owner 2026-10-11：「每次更新的時候先備份」〕：`ArtifactData` `list` `records`（`out_dir` 指到下面那個資料夾）＋ `get` `state`／`title`。
+   備份放 **`/Users/Shared/nodeapp-db-backup/bonji-mobile-artifact/<yyyyMMdd-HHmmss>/`**（repo 之外——本 repo 是 public，owner 記的內容不進版控）。
+   清單是空的也要留一個資料夾（寫一個 `EMPTY.txt`）：**「備份過、當時是空的」與「沒備份」要分得出來**。
+2. 重跑 `build.py`（結尾印出要宣告的 capabilities）。
+3. 以 Artifact 工具重新發佈 `artifact/dist/`（先 `read` 一次）。`capabilities` 不帶＝沿用上一版；**要改就整組重給**（沒重給的會被撤掉）。
+4. 發佈後再 `list` 一次 `records`，筆數要與第 1 步相同——**更新不該動到資料**。
+
+現在宣告的是 `downloads`（JSON 下載；沙盒會擋掉 `<a download>`）＋ `db`（紀錄清單；規則 `read`／`write` 都是 `owner`）。

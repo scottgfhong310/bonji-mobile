@@ -16,16 +16,19 @@
  *   normalizeOptions(o)        → 三個選項的白名單版本（從 localStorage 讀回來的不可信）
  *   normalizeDraft(d)          → { input, options } —— 草稿同上
  *   normalizeTitle(t)          → 標題的單行版本（**可以是空的、可以重複**）
- *   makeRecord(t, i, o, iso)   → 一筆紀錄 `{ title, input, options, savedAt }`；input 是空的回 null
+ *   makeRecord(t, i, o, iso, id, order) → 一筆紀錄 `{ title, input, options, savedAt, id, order }`；input 是空的回 null
  *   normalizeStore(s)          → { title, items } —— 紀錄清單（從 localStorage 讀回來的不可信）
  *   storeDrift(last, now)      → 'same' | 'changed' | 'lost' —— 儲存區裡的清單與這個畫面上次看到的比起來怎麼了
+ *   nextOrder(items, now)      → 新的一筆的排序值（一定排在現有每一筆之後）
+ *   mergeRemote(remote, put, del) → 遠端清單 ⊕ 這個畫面還沒被確認的寫入，依 order 排（Artifacts 版的同步用）
  *   addRecord／replaceRecord／removeRecord(items, …) → 新陣列（不改輸入）
  *   buildExport(items, convert, iso) → JSON 輸出的那個物件（輸出是匯出當下**算出來的**，不落地）
  *   exportFilename(date)       → `bonji-mobile-yyyyMMddHHmmss.json`
  *
  * 資料格式：catalog `{ categories: [{ id, entries: [{ code, char, group }] }] }`（bonji 的 BonjiInput.xlsx 匯出）；
  *           草稿 `{ input: string, options: { inputMethod, transliteration, ignoreSpacesAndHyphens } }`；
- *           紀錄清單 `{ items: [{ title, input, options, savedAt }] }`（標題欄的值另存一格，見控制器；舊格式的 `title` 仍讀得懂）；
+ *           紀錄清單 `{ items: [{ title, input, options, savedAt, id, order }] }`（標題欄的值另存一格，見控制器；舊格式的 `title` 仍讀得懂）；
+ *           `id`＝這一筆的身分（Artifacts 版一筆一份文件，文件名就是它）、`order`＝排序值；兩者都**不進 JSON 輸出**。
  *           JSON 輸出 `{ app, exportedAt, count, records: [{ seq, part, title, options, input, output, savedAt }] }`。
  * 後端 API：無（零後端，DATABASE_GUIDELINES §0 的第 0 層）。
  */
@@ -183,13 +186,17 @@
 
   // input 全是空白＝沒有東西可記 ⇒ null（呼叫端據此講「沒有可加入的內容」，不加一筆空的）
   // savedAt＝這一筆內容記下的那一刻（ISO 字串，由呼叫端給）；取代一筆時是取代的那一刻，不是它最初加入的時間
-  function makeRecord(title, input, options, savedAt) {
+  // id／order：沒給或不合格時是 ''／0（由控制器在加入的那一刻補上）。id 只收文件路徑容得下的字元。
+  var ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+  function makeRecord(title, input, options, savedAt, id, order) {
     if (typeof input !== 'string' || !input.trim()) return null;
     return {
       title: normalizeTitle(title),
       input: input,
       options: normalizeOptions(options),
-      savedAt: typeof savedAt === 'string' ? savedAt : ''
+      savedAt: typeof savedAt === 'string' ? savedAt : '',
+      id: typeof id === 'string' && ID_RE.test(id) ? id : '',
+      order: typeof order === 'number' && isFinite(order) ? order : 0
     };
   }
 
@@ -198,7 +205,7 @@
     s = (s && typeof s === 'object') ? s : {};
     var items = [];
     (Array.isArray(s.items) ? s.items : []).forEach(function (r) {
-      var rec = r && typeof r === 'object' ? makeRecord(r.title, r.input, r.options, r.savedAt) : null;
+      var rec = r && typeof r === 'object' ? makeRecord(r.title, r.input, r.options, r.savedAt, r.id, r.order) : null;
       if (rec) items.push(rec);
     });
     return { title: normalizeTitle(s.title), items: items };
@@ -214,6 +221,35 @@
     if (nowRaw === lastRaw) return 'same';
     if (typeof nowRaw !== 'string') return 'lost';
     return 'changed';
+  }
+
+  // 新的一筆排在現有每一筆之後：取「現在」與「目前最大的 order ＋ 1」較大的那個（兩台裝置的時鐘不必一致）
+  function nextOrder(items, now) {
+    var max = 0;
+    (Array.isArray(items) ? items : []).forEach(function (it) { if (it && it.order > max) max = it.order; });
+    return Math.max(typeof now === 'number' && isFinite(now) ? now : 0, max + 1);
+  }
+
+  /* Artifacts 版：清單住在 artifact 的資料庫裡，**一筆一份文件**（不是一整份清單一份文件——那就是 v2.181 的整格重寫）。
+   * 畫面上的清單＝遠端送來的那一份 ⊕ 這個畫面已經送出、還沒被確認的寫入：
+   *   put —— { id: rec }：加入／取代，遠端還沒有（或還是舊的）也先照新的顯示
+   *   del —— { id: true }：刪除，遠端還有也先不顯示
+   * 依 order 排，同值時依 id（兩台裝置看到的順序才會一樣）。不改傳進來的東西。 */
+  function mergeRemote(remote, put, del) {
+    put = put || {}; del = del || {};
+    var byId = {}, ids = [];
+    (Array.isArray(remote) ? remote : []).forEach(function (it) {
+      if (!it || !it.id || del[it.id] || byId[it.id]) return;
+      byId[it.id] = it; ids.push(it.id);
+    });
+    Object.keys(put).forEach(function (id) {
+      if (del[id] || !put[id]) return;
+      if (!byId[id]) ids.push(id);
+      byId[id] = put[id];
+    });
+    return ids.map(function (id) { return byId[id]; }).sort(function (a, b) {
+      return a.order - b.order || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    });
   }
 
   function addRecord(items, rec) {
@@ -290,6 +326,8 @@
     makeRecord: makeRecord,
     normalizeStore: normalizeStore,
     storeDrift: storeDrift,
+    nextOrder: nextOrder,
+    mergeRemote: mergeRemote,
     addRecord: addRecord,
     replaceRecord: replaceRecord,
     removeRecord: removeRecord,

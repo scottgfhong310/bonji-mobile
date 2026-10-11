@@ -39,7 +39,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
   };
 
   var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'vowel', catalog: null, elements: null, catalogFailed: false, sprite: {},
-    rec: { title: '', items: [] }, recRaw: null, recSaveTimer: 0, storageOk: true, storageLost: false, storageWarned: false, armed: null, armTimer: 0 };
+    rec: { title: '', items: [] }, recRaw: null, recSaveTimer: 0, storageOk: true, storageLost: false, storageWarned: false, armed: null, armTimer: 0,
+    // 同步（只有 Artifacts 版有，見「同步」那一段）：on＝清單已改由資料庫作主；last＝資料庫送來的那一份；
+    // put／del＝這個畫面送出、還沒被確認的寫入；local＝連上之前就在這支瀏覽器裡的（等第一份完整清單到了再決定送不送）
+    remote: { started: false, on: false, ready: false, down: '', unsynced: false, migrated: false, last: [], put: {}, del: {}, local: {}, titleTimer: 0, titleSent: null } };
 
   /* ---------- 外殼：貼齊可見範圍 ----------
    * iOS Safari 鍵盤彈出時不縮 layout viewport、而且會把頁面往上推；只有 visualViewport
@@ -347,10 +350,18 @@ import { SiddhamConverter } from "./siddham-converter.js";
   function readRaw(key) {
     try { return localStorage.getItem(key); } catch (e) { return null; }
   }
+  function newId() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  // 舊資料沒有 id／order：id 現給一個，order 照它在清單裡的位置（小數字 ⇒ 排在之後新加的前面）
+  function ensureIds(items) {
+    items.forEach(function (it, i) { if (!it.id) it.id = newId(); if (!it.order) it.order = i + 1; });
+    return items;
+  }
   function parseStore(raw) {
     var d = null;
     try { d = raw ? JSON.parse(raw) : null; } catch (e) {}
-    return Lib.normalizeStore(d);
+    var st = Lib.normalizeStore(d);
+    ensureIds(st.items);
+    return st;
   }
 
   /* ⚠️⚠️ 標題與清單**分兩格存**，而且各自只在自己被改的時候寫〔2026-10-11，owner 回報「清除標題把原來的紀錄也清掉了」〕。
@@ -370,6 +381,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
    * （加入＝接在它後面；取代／刪除／清除的序號可能已經不對 ⇒ 呼叫端停下來、請使用者再確認一次）。
    * 'lost'（我們寫過、現在讀不到）⇒ 儲存區不可靠，留著記憶裡的。 */
   function syncItems() {
+    if (remoteOn()) return 'same';   // 清單由資料庫作主：別處的更動由它推過來，不看這支瀏覽器的儲存區
     var raw = readRaw(REC_KEY);
     var drift = Lib.storeDrift(state.recRaw, raw);
     if (drift === 'changed') {
@@ -394,6 +406,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
 
   // 只有增刪改某一筆的那幾條路會走到這裡，而且它們都先 syncItems() 過
   function saveItems() {
+    if (remoteOn()) return;   // 同上：這支瀏覽器裡不留第二份（留著的話，別台刪掉的紀錄日後會從這裡被送回去）
     var text = JSON.stringify({ items: state.rec.items });
     var ok = false;
     try { localStorage.setItem(REC_KEY, text); ok = localStorage.getItem(REC_KEY) === text; } catch (e) {}
@@ -406,8 +419,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
       M.toast({ html: _esc(I18n.t('rec.storageFail')), classes: 'orange', displayLength: 6000 });
     }
   }
-  function currentRecord() {
-    return Lib.makeRecord($recTitle.value, $input.value, readOptions(), new Date().toISOString());
+  // keep：取代某一筆時傳它進來——身分（id）與位置（order）沿用，分段的順序就是資料
+  function currentRecord(keep) {
+    return Lib.makeRecord($recTitle.value, $input.value, readOptions(), new Date().toISOString(),
+      keep ? keep.id : newId(), keep ? keep.order : 0);
   }
   function titleOr(t) { return t || I18n.t('rec.untitled'); }
   function recToast(key, params, cls, ms) {
@@ -415,14 +430,16 @@ import { SiddhamConverter } from "./siddham-converter.js";
   }
 
   /* 「再按一次」：第一次按只上膛（鈕變成打勾、toast 講清楚再按一次會發生什麼），4 秒內再按同一顆才執行。 */
-  function isArmed(act, i) { return !!state.armed && state.armed.act === act && state.armed.i === i; }
+  // 上膛記的是「哪一筆」（id）不是第幾筆：同步把清單換過之後，序號可能已經指到別筆
+  function armKey(act, i) { var it = state.rec.items[i]; return act === 'clear' ? '*' : (it ? it.id : ''); }
+  function isArmed(act, i) { return !!state.armed && state.armed.act === act && state.armed.key === armKey(act, i); }
   function disarm() {
     clearTimeout(state.armTimer);
     state.armed = null;
   }
   function arm(act, i, key, params) {
     disarm();
-    state.armed = { act: act, i: i };
+    state.armed = { act: act, key: armKey(act, i) };
     state.armTimer = setTimeout(function () { state.armed = null; renderRecords(); }, 4000);
     renderRecords();
     recToast(key, params, 'orange');
@@ -433,10 +450,13 @@ import { SiddhamConverter } from "./siddham-converter.js";
     if (!rec) { recToast('rec.toast.nothing', null, 'orange'); return; }
     disarm();
     syncItems();   // 別的畫面記過新的 ⇒ 接在它們後面，不拿這邊舊的那一份蓋回去
+    rec.order = Lib.nextOrder(state.rec.items, Date.now());
     state.rec.items = Lib.addRecord(state.rec.items, rec);
     state.rec.title = rec.title;
     saveItems();
     saveTitle();
+    pushPut(rec);
+    pushTitle();
     renderRecords();
     setIconDone(trigger);
     // 短一點：toast 在頁首上方，停太久會擋住紀錄鈕（加完常常接著就要開面板）
@@ -459,6 +479,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
       disarm();
       state.rec.items = [];
       saveItems();
+      items.forEach(function (x) { pushDel(x.id); });
       renderRecords();
       recToast('rec.toast.cleared', { n: items.length }, 'grey');
       return;
@@ -477,13 +498,14 @@ import { SiddhamConverter } from "./siddham-converter.js";
       $ignoreSpaces.checked = it.options.ignoreSpacesAndHyphens;
       $input.value = it.input;
       saveTitle();
+      pushTitle();
       onInput();
       M.Modal.getInstance($recModal).close();
       recToast('rec.toast.loaded', { n: n, t: titleOr(it.title) }, 'teal');
       return;
     }
     if (act === 'replace') {
-      var rec = currentRecord();
+      var rec = currentRecord(it);
       if (!rec) { recToast('rec.toast.nothing', null, 'orange'); return; }
       if (!isArmed(act, i)) { arm(act, i, 'rec.toast.confirmReplace', { n: n }); return; }
       disarm();
@@ -491,6 +513,8 @@ import { SiddhamConverter } from "./siddham-converter.js";
       state.rec.title = rec.title;
       saveItems();
       saveTitle();
+      pushPut(rec);
+      pushTitle();
       renderRecords();
       recToast('rec.toast.replaced', { n: n }, 'teal');
       return;
@@ -500,6 +524,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
       disarm();
       state.rec.items = Lib.removeRecord(items, i);
       saveItems();
+      pushDel(it.id);
       renderRecords();
       recToast('rec.toast.removed', { n: n }, 'grey');
     }
@@ -511,6 +536,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     $recTitle.value = '';
     state.rec.title = '';
     saveTitle();
+    pushTitle();
     setIconDone(trigger);
     recToast('rec.toast.titleCleared', null, 'grey', 1800);
   }
@@ -597,6 +623,146 @@ import { SiddhamConverter } from "./siddham-converter.js";
       list.appendChild(li);
     });
     renderRecCurrent();
+    renderRecNote();
+  }
+
+  /* ---------- 同步：清單住在 artifact 的資料庫裡（只有 Artifacts 版有） ----------
+   * 〔2026-10-11，owner 實測〕iPhone 的 Claude App 把 artifact 關掉重開，localStorage 裡的清單就讀不回來——
+   * 清單不能只放在瀏覽器裡。Artifacts 版多載一支 `remote-db.js`（artifact/src/，由 build.py 帶進去），
+   * 它把 `window.BonjiMobileRemote` 掛上來；GitHub／3001 那一份沒有它，下面整段都不會動，清單照舊存 localStorage。
+   * ⭐ 資料庫裡**一筆一份文件**（文件名＝那一筆的 id）：加入／取代／刪除各自只碰自己那一份，
+   *    沒有「整份清單寫回去」這個動作 ⇒ 兩台裝置同時記也不會互相蓋掉（v2.181 那個坑在這裡結構上不存在）。
+   * 畫面上的清單＝資料庫送來的（last）⊕ 這個畫面送出、還沒被確認的寫入（put／del），見 lib 的 mergeRemote。 */
+  function remoteOn() { return state.remote.on; }
+
+  function startRemote() {
+    var R = window.BonjiMobileRemote, rm = state.remote;
+    if (!R || rm.started) return;
+    rm.started = true;
+    renderRecNote();
+    R.start({
+      onReady: function () {
+        // 從這一刻起清單由資料庫作主。這支瀏覽器裡原本有的（載入後、連上前記下的也算）先留在畫面上，
+        // 等第一份完整的清單到了，再決定哪幾筆要送上去（migrateLocal）
+        rm.on = true;
+        state.rec.items.forEach(function (it) { rm.local[it.id] = it; });
+        renderRecNote();
+      },
+      onItems: function (list, definitive) {
+        rm.ready = true;
+        rm.last = Lib.normalizeStore({ items: list }).items;   // 資料庫來的一樣走白名單
+        applyRemote();
+        // 不在這個回呼裡寫資料庫（回呼裡寫＝每來一份就寫一次的迴圈）：排到下一輪，而且只做一次
+        if (definitive && !rm.migrated) { rm.migrated = true; setTimeout(migrateLocal, 0); }
+      },
+      onTitle: function (t) {
+        t = Lib.normalizeTitle(t);
+        rm.titleSent = t;
+        if (document.activeElement === $recTitle || t === state.rec.title) return;   // 正在打的那一欄不搶
+        state.rec.title = t;
+        $recTitle.value = t;
+        saveTitle();
+      },
+      onDown: function (code) {
+        rm.down = String(code || 'unavailable');
+        renderRecNote();
+      }
+    });
+  }
+
+  function applyRemote() {
+    var rm = state.remote, pending = {};
+    Object.keys(rm.local).forEach(function (id) { pending[id] = rm.local[id]; });
+    Object.keys(rm.put).forEach(function (id) { pending[id] = rm.put[id]; });
+    state.rec.items = Lib.mergeRemote(rm.last, pending, rm.del);
+    // 上膛的那一筆在別處被刪掉了 ⇒ 解除
+    if (state.armed && state.armed.key !== '*' && !state.rec.items.some(function (it) { return it.id === state.armed.key; })) disarm();
+    renderRecords();
+  }
+
+  // 連上之前就在這支瀏覽器裡的紀錄：資料庫裡還沒有的送上去；已經有同一筆的以資料庫為準、不送。
+  // 全部送成功之後這支瀏覽器裡那一份就拿掉——留著的話，日後在別台刪掉的紀錄會從這裡被送回去。
+  function migrateLocal() {
+    var rm = state.remote, have = {}, jobs = [];
+    rm.last.forEach(function (it) { have[it.id] = true; });
+    Object.keys(rm.local).forEach(function (id) {
+      var rec = rm.local[id];
+      delete rm.local[id];
+      if (!have[id]) jobs.push(pushPut(rec));
+    });
+    Promise.all(jobs).then(function (oks) {
+      if (!oks.every(Boolean)) return;
+      try { localStorage.removeItem(REC_KEY); } catch (e) {}
+      state.recRaw = null;
+    });
+    applyRemote();
+  }
+
+  // 回傳 Promise<boolean>（存到資料庫了沒）。沒存到的那一筆留在畫面上，並在面板上講。
+  function pushPut(rec) {
+    var rm = state.remote;
+    if (!rm.on) return Promise.resolve(true);
+    rm.put[rec.id] = rec;
+    delete rm.del[rec.id];
+    delete rm.local[rec.id];   // 這一筆已經由這次寫入負責；留著的話 migrateLocal 會拿舊的那一份再送一次
+    return window.BonjiMobileRemote.put(rec).then(function () {
+      if (rm.put[rec.id] !== rec) return true;   // 這一筆在等的期間又被改過，留給後面那一次
+      // 確認存到了：把它併進「資料庫那一份」再從待確認拿掉（否則下一份清單送到之前，它會從畫面上消失一下）
+      rm.last = rm.last.filter(function (it) { return it.id !== rec.id; }).concat([rec]);
+      delete rm.put[rec.id];
+      return true;
+    }, function (e) { remoteFail(e); return false; });
+  }
+
+  function pushDel(id) {
+    var rm = state.remote;
+    if (!rm.on) return;
+    rm.del[id] = true;
+    delete rm.put[id];
+    delete rm.local[id];
+    window.BonjiMobileRemote.remove(id).then(function () {
+      rm.last = rm.last.filter(function (it) { return it.id !== id; });
+      delete rm.del[id];
+    }, function (e) {
+      delete rm.del[id];   // 沒刪成：資料庫裡還在，畫面上照實放回來
+      remoteFail(e);
+      applyRemote();
+    });
+  }
+
+  function remoteFail(e) {
+    state.remote.unsynced = true;
+    renderRecNote();
+    recToast('rec.toast.syncFail', { m: String((e && (e.code || e.message)) || e) }, 'red', 6000);
+  }
+
+  // 標題欄的值也同步（換裝置、重開時接著用同一個標題）；值沒變就不寫
+  function pushTitle() {
+    var rm = state.remote;
+    clearTimeout(rm.titleTimer);
+    if (!rm.on || rm.titleSent === state.rec.title) return;
+    rm.titleSent = state.rec.title;
+    window.BonjiMobileRemote.setTitle(state.rec.title).then(null, function () { rm.titleSent = null; });
+  }
+  function pushTitleSoon() {
+    clearTimeout(state.remote.titleTimer);
+    if (state.remote.on) state.remote.titleTimer = setTimeout(pushTitle, 800);
+  }
+
+  // 面板底下那一行：清單現在存在哪裡。沒有同步的那一份（GitHub／3001）恆是「只存在這支瀏覽器裡」。
+  function renderRecNote() {
+    var el = document.getElementById('rec-note'), rm = state.remote;
+    var key = 'rec.note', warn = false, params = null;
+    if (rm.started) {
+      if (rm.down) { key = 'rec.noteDown'; warn = true; params = { m: rm.down }; }
+      else if (rm.unsynced) { key = 'rec.noteUnsynced'; warn = true; }
+      else if (rm.ready) key = 'rec.noteRemote';
+      else key = 'rec.noteConnecting';
+    }
+    el.textContent = I18n.t(key, params);
+    el.classList.toggle('rec-warn', warn);
+    // 清單已經不靠這支瀏覽器的儲存區了 ⇒「這支瀏覽器記不住」那一行不再適用
+    if (rm.on && !rm.down) document.getElementById('rec-storage-note').hidden = true;
   }
 
   function openRecords() {
@@ -689,6 +855,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     $recTitle.addEventListener('input', function () {
       state.rec.title = Lib.normalizeTitle($recTitle.value);
       saveTitleSoon();
+      pushTitleSoon();
     });
 
     // 別的分頁改了清單 ⇒ 這邊跟著換（只在「別的文件」寫入時才會收到這個事件）。key 為 null＝整個儲存區被清空
@@ -865,6 +1032,9 @@ import { SiddhamConverter } from "./siddham-converter.js";
     fitShell();
     convert();
     renderRecords();
+    // 同步那一支若已經載入就接上；晚到的話它會發這個事件（兩者的先後不保證）
+    startRemote();
+    document.addEventListener('bonji-mobile:remote', startRemote);
     loadCatalog().then(function () { renderKeybar(); fitShell(); });
   }
 

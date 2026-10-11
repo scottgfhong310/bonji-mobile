@@ -39,6 +39,9 @@ async function loadWorld() {
     elements: JSON.parse(read(path.join(APP, 'data', 'element-catalog.json'))),
     // CBETA 字形 sprite：刻意不進 GitHub ⇒ clone 下來的那一份沒有它，㉖ 回 SKIP（不是 PASS）
     sprite: fs.existsSync(path.join(APP, 'cbeta', 'cbeta-ligatures.svg')) ? read(path.join(APP, 'cbeta', 'cbeta-ligatures.svg')) : null,
+    // Artifacts 版才有的兩個檔：紀錄清單的同步（㉟）
+    remote: read(path.join(REPO, 'artifact', 'src', 'remote-db.js')),
+    build: read(path.join(REPO, 'artifact', 'build.py')),
     locales: {}
   };
   for (const code of ['zh-Hant', 'en', 'ja']) w.locales[code] = loadLocale(path.join(APP, 'locales', code + '.js'));
@@ -481,8 +484,10 @@ check('㉛ normalizeStore', (w) => {
     { title: 5, input: 'o;m', options: { inputMethod: 'x' }, savedAt: 7 }, { title: 't', input: '  ' }, 'junk', null,
     { title: 't', input: 'hrii.h', options: kh, savedAt: 'S', extra: 1 }] });
   const ok = s.title === 'a b' && s.items.length === 2 &&
-    eq(s.items[0], { title: '', input: 'o;m', options: d, savedAt: '' }) &&
-    eq(s.items[1], { title: 't', input: 'hrii.h', options: kh, savedAt: 'S' }) &&
+    eq(s.items[0], { title: '', input: 'o;m', options: d, savedAt: '', id: '', order: 0 }) &&
+    eq(s.items[1], { title: 't', input: 'hrii.h', options: kh, savedAt: 'S', id: '', order: 0 }) &&
+    // id／order：合格的留著（它們是那一筆的身分與位置），不合格的清掉（id 會被拿去當文件路徑）
+    eq(L.normalizeStore({ items: [{ input: 'a', id: 'r1_x-9', order: 7 }, { input: 'b', id: 'a/b', order: 'x' }] }).items.map((i) => i.id + ':' + i.order), ['r1_x-9:7', ':0']) &&
     eq(L.normalizeStore(null), { title: '', items: [] }) && eq(L.normalizeStore({ items: 'x' }), { title: '', items: [] });
   return ok || 'FAIL';
 });
@@ -558,6 +563,45 @@ check('㉞ 改標題不碰清單；動清單前先看儲存區', (w) => {
   const callers = [...w.js.matchAll(/\n  function (\w+)\([^)]*\) \{[\s\S]*?\n  \}/g)].filter((m) => /saveItems\(\)/.test(m[0]) && m[1] !== 'saveItems').map((m) => m[1]).sort().join(',');
   if (callers !== 'addCurrent,recAction') miss.push('會寫清單的函式變了：' + callers);
   if (!/addEventListener\('storage'/.test(w.js)) miss.push('沒有聽 storage 事件');
+  return miss.length ? 'FAIL: ' + miss.join('、') : true;
+});
+
+// ㉟ Artifacts 版的清單住在 artifact 的資料庫裡〔owner 2026-10-11 實測：iPhone 的 Claude App 把 artifact 關掉重開，localStorage 就讀不回來〕。
+//    (a) **一筆一份文件**——加入／取代只 set 自己那一份、刪除只 delete 自己那一份；沒有「整份清單」那種文件（整份寫回去就是 ㉞ 那個坑）
+//    (b) 畫面上的清單＝資料庫送來的 ⊕ 這個畫面還沒被確認的寫入（mergeRemote），依 order 排、同值依 id
+//    (c) 資料庫作主之後不再寫這支瀏覽器的清單那一格（留著的話，別台刪掉的紀錄日後會從這裡被送回去）
+//    (d) id／order 不進 JSON 輸出；build.py 真的把那支同步帶進去，而且宣告的規則是 owner 才讀寫
+check('㉟ Artifacts 版：清單存資料庫、一筆一份文件', (w) => {
+  const L = w.Lib, miss = [];
+  const r = (id, order, input) => ({ id, order, input: input || id, title: '', options: L.DEFAULT_OPTIONS, savedAt: '' });
+  const remote = [r('b', 20), r('a', 10), r('c', 30)];
+  const ids = (xs) => xs.map((x) => x.id + (x.input !== x.id ? '=' + x.input : '')).join(' ');
+  if (ids(L.mergeRemote(remote, {}, {})) !== 'a b c') miss.push('沒依 order 排');
+  if (ids(L.mergeRemote(remote, { d: r('d', 15), b: r('b', 20, 'NEW') }, { c: true })) !== 'a d b=NEW') miss.push('待確認的寫入沒併進去：' + ids(L.mergeRemote(remote, { d: r('d', 15), b: r('b', 20, 'NEW') }, { c: true })));
+  if (ids(L.mergeRemote([r('y', 5), r('x', 5)], {}, {})) !== 'x y') miss.push('order 相同時沒依 id 排（兩台裝置會看到不同順序）');
+  if (ids(L.mergeRemote(remote, { c: r('c', 30, 'Z') }, { c: true })) !== 'a b') miss.push('已刪除的又被待確認的寫入帶回來');
+  if (remote.map((x) => x.id).join('') !== 'bac') miss.push('mergeRemote 改了傳進來的陣列');
+  if (L.nextOrder([r('a', 10), r('b', 99)], 50) !== 100 || L.nextOrder([], 50) !== 50 || L.nextOrder([r('a', 10)], 50) !== 50) miss.push('nextOrder');
+  const rec = L.makeRecord('t', 'o;m', null, 'S', 'rabc', 42);
+  if (!rec || rec.id !== 'rabc' || rec.order !== 42) miss.push('makeRecord 沒帶 id／order');
+  const out = L.buildExport([rec], () => ({ siddham: 's', latin: 'l', ascii: 'a', codepoints: 'c' }), 'T').records[0];
+  if ('id' in out || 'order' in out) miss.push('id／order 漏進 JSON 輸出');
+  // 同步那一支：只對 records/<id> 與 state/title 做 set／delete
+  const src = w.remote.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s\/\/.*$/gm, '');
+  if (!/db\.collection\(COL\)\.doc\(rec\.id\)\.set\(\{/.test(src)) miss.push('put 不是寫 records/<id> 那一份');
+  if (!/db\.collection\(COL\)\.doc\(id\)\.delete\(\)/.test(src)) miss.push('remove 不是刪 records/<id> 那一份');
+  const sets = [...src.matchAll(/\.set\(/g)].length;
+  if (sets !== 2) miss.push('同步那一支有 ' + sets + ' 處 set（應為 2：一筆紀錄、標題）');
+  if (/items\s*:/.test(src)) miss.push('同步那一支出現整份清單的寫法（items:）');
+  if (!/fromCache/.test(src)) miss.push('沒有分辨「還不是完整版本」的清單');
+  // 控制器：資料庫作主時不碰這支瀏覽器的清單那一格
+  if (!/function saveItems\(\) \{\s*if \(remoteOn\(\)\) return;/.test(w.js)) miss.push('資料庫作主時仍寫 localStorage 的清單');
+  if (!/function syncItems\(\) \{\s*if \(remoteOn\(\)\) return 'same';/.test(w.js)) miss.push('資料庫作主時仍拿 localStorage 蓋掉清單');
+  if (!/Lib\.normalizeStore\(\{ items: list \}\)/.test(w.js)) miss.push('資料庫來的清單沒走白名單');
+  // 建置：帶進 dist、在控制器之前載入、宣告 owner 才讀寫
+  if (!/shutil\.copy2\(HERE \/ 'src' \/ 'remote-db\.js'/.test(w.build)) miss.push('build.py 沒帶 remote-db.js');
+  if (!/\('index\.html', CONTROLLER_TAG, REMOTE_TAG \+ CONTROLLER_TAG\)/.test(w.build)) miss.push('build.py 沒在控制器之前載入它');
+  if (!/"db": \{"rules": \[\{"path": "", "read": "owner", "write": "owner"\}\]\}/.test(w.build)) miss.push('宣告的規則不是 owner 才讀寫');
   return miss.length ? 'FAIL: ' + miss.join('、') : true;
 });
 
@@ -649,6 +693,13 @@ const MUTANTS = [
   ['㉞', '加入之前不看儲存區', (w) => { w.js = w.js.replace('    syncItems();   // 別的畫面記過新的', '    // 別的畫面記過新的'); }],
   ['㉞', '刪除／取代不管別處改過', (w) => { w.js = w.js.replace("if (syncItems() === 'changed') {\n      disarm();\n      renderRecords();\n      recToast", "if (false) {\n      disarm();\n      renderRecords();\n      recToast"); }],
   ['㉞', '讀不到被當成清單被清空', (w) => { w.Lib.storeDrift = (a, b) => (a === b ? 'same' : 'changed'); }],
+  ['㉟', '刪除被待確認的寫入帶回來', (w) => { const f = w.Lib.mergeRemote; w.Lib.mergeRemote = (re, put, del) => f(re, put, {}).filter((x) => !(del || {})[x.id] || (put || {})[x.id]); }],
+  ['㉟', '清單不排序（照資料庫給的順序）', (w) => { w.Lib.mergeRemote = (re, put, del) => re.filter((x) => !del[x.id]).map((x) => put[x.id] || x).concat(Object.keys(put).filter((id) => !re.some((x) => x.id === id) && !del[id]).map((id) => put[id])); }],
+  ['㉟', 'id 漏進 JSON 輸出', (w) => { const f = w.Lib.buildExport; w.Lib.buildExport = (items, c, t) => { const e = f(items, c, t); e.records.forEach((r, i) => { r.id = items[i].id; }); return e; }; }],
+  ['㉟', '同步改成整份清單寫一份文件', (w) => { w.remote = w.remote.replace("return db.collection(COL).doc(rec.id).set({", "return db.doc('state/list').set({ items: [rec] }); db.collection(COL).doc(rec.id).set({"); }],
+  ['㉟', '資料庫作主時又寫回 localStorage', (w) => { w.js = w.js.replace("    if (remoteOn()) return;   // 同上", "    // 同上"); }],
+  ['㉛', '讀回的 id 不驗證（會被拿去當文件路徑）', (w) => { const f = w.Lib.normalizeStore; w.Lib.normalizeStore = (s) => { const o = f(s); ((s && s.items) || []).forEach((r, i) => { if (o.items[i] && r && r.id) o.items[i].id = r.id; }); return o; }; }],
+  ['㉟', '規則放寬成任何看得到的人都能讀', (w) => { w.build = w.build.replace('"read": "owner"', '"read": "view"'); }],
   ['⑭', '紀錄的 toast 用了未定義的 key', (w) => { w.js = w.js.replace("recToast('rec.toast.replaced'", "recToast('rec.toast.replacedX'"); }]
 ];
 

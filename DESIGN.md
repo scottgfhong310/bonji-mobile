@@ -1,6 +1,6 @@
 # bonji-mobile — 設計決議
 
-> 版本 v1.4｜2026-10-11
+> 版本 v1.5｜2026-10-11
 
 「怎麼用」在 README，「為什麼長這樣」在這裡。家族共同規範（結構／i18n／主題／側鍵）只標引用、不重複：
 [DESIGN_GUIDELINES](https://github.com/scottgfhong310/nodeapp-webapp-family/blob/main/DESIGN_GUIDELINES.md)。
@@ -213,6 +213,7 @@ WebKit bug 200627）。⚠️ 來源是 2016–2022 年的，未在現行 iOS �
 ——`materialize.min.css` 自己託管（CSP 擋 cdnjs 樣式表且不報錯）。
 **2026-10-11 起是兩處**：紀錄清單的 JSON 下載改走 `downloads` capability（沙盒擋掉 `<a download>`，blob: 也一樣，而且不報錯）
 ⇒ **發佈時要宣告 `capabilities: {downloads: true}`**。補丁的錨點是 `downloadText()` 的函式本體，兩邊契約相同（`Promise<boolean>`）。
+**同日第三處**：紀錄清單改存 artifact 的資料庫（`db` capability），多帶一支 `artifact/src/remote-db.js`——見 §10.4。
 
 ⚠️ **已知未驗**：Artifacts 版跑在宿主頁的 iframe 裡。鍵盤彈出時 iframe 自己的 `visualViewport` 會不會跟著縮，**取決於宿主怎麼排版那個 iframe**，
 不是本 app 控制得了的。若手機上實測輸入被鍵盤蓋住，原因多半在這一層，要另想辦法（不是改 `fitShell` 的算式）。
@@ -293,6 +294,46 @@ owner 的需求：「增加一個 json output 的介面，也可以記錄 title 
 
 ⚠️ **沒有救回來的**：已經被蓋掉的紀錄不在任何地方有第二份（`localStorage` 沒有版本歷史）。
 ⚠️ **這次修的不是「清單撐不撐得過關掉頁面」**（iOS 上的 Artifacts 版，§10 那一條）——那是另一個、仍未解決的風險。
+
+### 10.4 Artifacts 版：清單住在 artifact 的資料庫裡〔2026-10-11，owner 實測後〕
+
+**確定下來的事實**：owner 在 iPhone 的 Claude App 裡把 artifact 關掉重開，存的〈心經〉咒語也沒了——那時跑的已經是 §10.3 修過的版本。
+⇒ 那個環境裡 `localStorage` **撐不過關掉重開**（家族 memory `artifact-runtime-gotchas` 第 5 條，這次是實證）。§10.3 修掉的整格重寫是真的缺陷，但 owner 遇到的是這一個。
+owner 的要求：「在每次更新的時候，可以先備份或同步資料嗎？尤其是在 artifact 的部分。」
+
+**做法**：Artifacts 版多一支 `remote-db.js`（`db` capability；只有 Artifacts 版有，`build.py` 帶進去）。
+
+| | GitHub／3001 | Artifacts |
+|---|---|---|
+| 清單存在哪 | `localStorage`（§10.3 的兩格） | artifact 的資料庫：`records/<id>` **一筆一份文件**、`state/title` 一份 |
+| 撐得過關掉重開／更新 | 看瀏覽器 | 是（資料庫跟著 artifact，不跟著版本） |
+| 換裝置 | 各存各的 | 同一份，別台的更動即時推過來 |
+| Claude 讀得到（備份） | 否 | 是（`ArtifactData`）——**每次發佈前先備份**，流程在 CLAUDE.md |
+
+- ⭐ **一筆一份文件**：加入／取代只 `set` 自己那一份、刪除只 `delete` 自己那一份，**沒有「整份清單寫回去」這個動作**
+  ⇒ 兩台裝置同時記也不會互相蓋掉。§10.3 那個坑在這裡結構上不存在（第 ㉟ 條盯著同步那一支只有兩處 `set`）。
+- 每一筆因此有 `id`（文件名）與 `order`（排序值：加入時取「現在」與「目前最大值＋1」較大者；取代沿用）。兩者**不進 JSON 輸出**。
+  排序在畫面這一側做（依 `order`、同值依 `id`），兩台裝置看到的順序才會一樣。
+- **畫面上的清單＝資料庫送來的 ⊕ 這個畫面還沒被確認的寫入**（lib 的 `mergeRemote`）：按下加入的那一刻就看得到，不等網路；
+  沒存成的那一筆**留在畫面上**並亮紅字（「有更動沒有存進資料庫」）——不讓它安靜地消失，也不假裝存好了。
+- **資料庫作主之後，這支瀏覽器的清單那一格就不再寫**：留著第二份的話，日後在別台刪掉的紀錄會從這裡被送回去。
+  連上之前就在瀏覽器裡的（含載入後、連上前記下的）先留在畫面上，等**第一份伺服器確認過的完整清單**到了：資料庫還沒有的送上去、已經有的以資料庫為準，全部送成功後清掉本機那一格。
+- 「再按一次」記的是**哪一筆**（`id`）不是第幾筆：別台刪了一筆、清單往上遞補時，上膛的仍是原來那一筆（實測）。
+- **接點只有一個**：控制器看 `window.BonjiMobileRemote`（沒有就整段不動），那一支掛好後發 `bonji-mobile:remote` 事件——兩個 script 的先後不保證。
+- **規則是只有 artifact 的 owner 讀寫**（`{ path: "", read: "owner", write: "owner" }`）：artifact 日後就算分享出去，別人也讀不到 owner 記的內容
+  （對他們而言同步「連不上」，清單退回只存在瀏覽器裡，面板上會講）。
+- 連不上（沒有這個環境、沒被授權、訂閱斷了）一律**在面板上講**，並退回 `localStorage`。
+
+**驗證到哪裡**（分開記）：
+
+| 驗了什麼 | 怎麼驗的 |
+|---|---|
+| 記兩筆 → 清掉整個 `localStorage` → 重新載入 → 兩筆與標題都回來 | preview＋**模擬的資料庫**（同一支 `remote-db.js`） |
+| 別台加一筆即時出現、取代只寫同一份文件、刪除只刪那一份、上膛跟著 id | 同上 |
+| 寫入失敗：那一筆留在畫面上、紅字、toast；連不上：紅字、退回本機 | 同上 |
+| 本機舊紀錄遷上去、本機那一格清掉 | 同上 |
+| **真的資料庫**：規則宣告被接受、`records` 讀得到 | 發佈後以 `ArtifactData` 查 |
+| **iPhone 的 Claude App 上真的記一筆、關掉重開還在** | **要 owner 實測**——模擬的資料庫證明的是這一側的邏輯，不是平台 |
 
 ### 10.2 刻意沒做的
 
