@@ -4,8 +4,8 @@
  * 悉曇轉換本身不在這裡：唯一的轉換介面是 ./siddham-converter.js（ESM 防腐層，
  * bonji 的 byte-identical 複製件）。本檔放的是**這支 app 自己的、離開畫面仍成立**的邏輯：
  *
- *   KEYSET_IDS                 記號列的六組（切換順序）：'vowel'（母音）→ 'variant'（異體字）→ 'bindu'（體文）
- *                              → 'ligature_u'（上接續）→ 'ligature_l'（下接續）→ 'ligature'（接續）
+ *   KEYSET_IDS                 記號列的七組（切換順序）：'vowel'（母音）→ 'variant'（異體字）→ 'bindu'（體文）
+ *                              → 'ligature_u'（上接續）→ 'ligature_l'（下接續）→ 'ligature'（接續）→ 'symbol'（符號）
  *   keysFromCatalog(cat, id)   → [{ ins, glyph }] —— 由 bonji 的 data/catalog.json 推出該組的鍵
  *   keysFromElements(el, id)   → [{ ins, cbeta }] —— 由 data/element-catalog.json 的 Cbeta 群推出（上／下接續）
  *   keysFor(cat, el, id)       → 依組別分派到上面兩支
@@ -53,7 +53,10 @@
    *    而 Kyoto-Harvard 的大寫有意義——catalog 的 `S`（舊寫法的齒音 s）在 KH 下會變成 ṣ（實測）。
    *    小寫之後兩種輸入法結果相同，記號列就不必分兩套。鍵上印的也是插入的那個字串。
    * 同一組裡同一個記法只留第一個（現況 0 個重複；防的是 xlsx 日後多一列）。 */
-  var KEYSET_IDS = ['vowel', 'variant', 'bindu', 'ligature_u', 'ligature_l', 'ligature'];
+  // 符號 symbol〔owner 2026-10-11〕—— catalog 的 symbol 類：句讀與章節記號（`|` 𑗅 `||` 𑗉 `--` `,,` `..` `*` `2` `@` `=`）
+  //   與裝飾記號（`*1`～`*7` `*0` `o2` `o2x` `ox2`～`ox4` `oxx`）。全是 Unicode 悉曇（group siddham），Noto 畫得出來。
+  //   排在最後：一段裡用得到的次數最少（多半只在結尾），不該擋在打字時常切的那幾組前面。
+  var KEYSET_IDS = ['vowel', 'variant', 'bindu', 'ligature_u', 'ligature_l', 'ligature', 'symbol'];
   // 這兩組的資料不在 catalog.json（那裡只有 Mojikyo 群），而在 element-catalog.json 的 Cbeta 群
   var ELEMENT_SETS = { ligature_u: true, ligature_l: true };
 

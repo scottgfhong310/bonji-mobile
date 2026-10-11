@@ -43,6 +43,7 @@ async function loadWorld() {
     remote: read(path.join(REPO, 'artifact', 'src', 'remote-db.js')),
     build: read(path.join(REPO, 'artifact', 'build.py')),
     backup: read(path.join(REPO, 'scripts', 'backup-artifact.sh')),
+    font: fs.readFileSync(path.join(APP, 'fonts', 'NotoSansSiddham-Regular.woff2')),
     locales: {}
   };
   for (const code of ['zh-Hant', 'en', 'ja']) w.locales[code] = loadLocale(path.join(APP, 'locales', code + '.js'));
@@ -347,9 +348,14 @@ check('㉓ 複製鈕在欄位底部', (w) => {
 
 // ㉔ 記號列六組的順序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續〔owner 2026-10-08／09：母音在體文前、異體字在母音後、上下接續在體文後〕。
 //    切換鈕依 KEYSET_IDS 的順序循環、預設是第一組 ⇒ 順序本身就是規格。
-check('㉔ 記號列六組依序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續', (w) => {
+check('㉔ 記號列七組依序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續 → 符號', (w) => {
   const ids = w.Lib.KEYSET_IDS.join(',');
-  if (ids !== 'vowel,variant,bindu,ligature_u,ligature_l,ligature') return 'FAIL: KEYSET_IDS = ' + ids;
+  if (ids !== 'vowel,variant,bindu,ligature_u,ligature_l,ligature,symbol') return 'FAIL: KEYSET_IDS = ' + ids;
+  // 符號〔owner 2026-10-11〕：catalog 的 symbol 類整組都收（全是 Unicode 悉曇）；字形對不對由 ② 逐一驗，這裡只確認它不是空的、而且句讀 `|` `||` 在裡面
+  const sym = w.Lib.keysFromCatalog(w.catalog, 'symbol');
+  const want = (w.catalog.categories.find((c) => c.id === 'symbol') || { entries: [] }).entries.filter((e) => e.group === 'siddham').length;
+  if (!sym.length || sym.length !== want) return 'FAIL: 符號 ' + sym.length + ' 鍵（catalog 的 symbol 類有 ' + want + ' 格 Unicode 悉曇）';
+  if (!sym.some((k) => k.ins === '|' && k.glyph === '𑗅') || !sym.some((k) => k.ins === '||' && k.glyph === '𑗉')) return 'FAIL: 符號組裡沒有 | 𑗅／|| 𑗉';
   const nu = w.Lib.keysFor(w.catalog, w.elements, 'ligature_u').length, nl = w.Lib.keysFor(w.catalog, w.elements, 'ligature_l').length;
   if (nu !== 39 || nl !== 44) return 'FAIL: 上接續 ' + nu + '／下接續 ' + nl + ' 鍵（element-catalog 的 Cbeta 群應為 39／44——不去重）';
   const v = w.Lib.keysFromCatalog(w.catalog, 'variant').map((k) => k.ins).join(' ');
@@ -649,6 +655,55 @@ check('㊱ 備份腳本：空的不輪替／檔數要對得上／壞的不覆蓋
   }
 });
 
+// ㊲ 記號列上每一顆畫 Unicode 字形的鍵，**隨附的那支 Noto Sans Siddham 都要有那個字**（直接讀 woff2 的 cmap）。
+//    ⚠️ 這件事在 Mac 上用眼睛看不出來：macOS 自己帶一支悉曇字型，隨附的那支缺字時畫面上照樣有字（系統後備接走）；
+//       手機上沒有那支後備，缺的那一格就是豆腐。2026-10-11 加「符號」組時量像素量不出結果（後備與隨附的字形長得一樣），才改成讀字型本身。
+function woff2Covers(buf) {
+  const zlib = require('zlib');
+  if (buf.toString('latin1', 0, 4) !== 'wOF2') throw new Error('不是 woff2');
+  const numTables = buf.readUInt16BE(12);
+  let p = 48;
+  const b128 = () => { let v = 0; for (let i = 0; i < 5; i++) { const c = buf[p++]; v = (v << 7) | (c & 0x7f); if (!(c & 0x80)) return v >>> 0; } throw new Error('UIntBase128 讀不出來'); };
+  const tables = [];
+  for (let i = 0; i < numTables; i++) {
+    const flags = buf[p++], idx = flags & 0x3f, ver = flags >> 6;
+    if (idx === 63) p += 4;                       // 不在已知清單裡的 tag：後面跟 4 個位元組
+    const orig = b128();
+    // glyf(10)／loca(11) 的 transform 版本 0＝有轉換；其餘的表非 0 才有 ⇒ 有轉換的多一個 transformLength
+    const transformed = (idx === 10 || idx === 11) ? ver === 0 : ver !== 0;
+    tables.push({ idx, len: transformed ? b128() : orig });
+  }
+  const data = zlib.brotliDecompressSync(buf.subarray(p, p + buf.readUInt32BE(20)));
+  let off = 0, cmap = null;
+  for (const t of tables) { if (t.idx === 0) cmap = data.subarray(off, off + t.len); off += t.len; }   // 0 ＝ cmap
+  if (!cmap) throw new Error('字型裡沒有 cmap');
+  const groups = [];
+  for (let i = 0, n = cmap.readUInt16BE(2); i < n; i++) {
+    const so = cmap.readUInt32BE(4 + i * 8 + 4);
+    if (cmap.readUInt16BE(so) !== 12) continue;   // 悉曇在 BMP 之外 ⇒ 只看 format 12
+    for (let g = 0, ng = cmap.readUInt32BE(so + 12); g < ng; g++) groups.push([cmap.readUInt32BE(so + 16 + g * 12), cmap.readUInt32BE(so + 20 + g * 12)]);
+  }
+  if (!groups.length) throw new Error('cmap 沒有 format 12 的子表');
+  return (cp) => groups.some(([a, b]) => cp >= a && cp <= b);
+}
+check('㊲ 隨附的 Noto 畫得出記號列上每一個 Unicode 字形', (w) => {
+  const has = woff2Covers(w.font);
+  // 對照組：讀法壞掉時（全部回 true／全部回 false）這兩行會先紅
+  if (!has(0x1158E)) return 'FAIL: 對照組——字型裡應該有 U+1158E（ka）';
+  if (has(0x11600) || has(0x5B57)) return 'FAIL: 對照組——字型裡不該有 U+11600（Modi）或 U+5B57（漢字）';
+  const miss = [];
+  let n = 0;
+  for (const id of w.Lib.KEYSET_IDS) {
+    for (const k of w.Lib.keysFromCatalog(w.catalog, id)) {
+      if (!k.glyph) continue;
+      n++;
+      for (const ch of k.glyph) if (!has(ch.codePointAt(0))) miss.push(id + ':' + k.ins + ' U+' + ch.codePointAt(0).toString(16).toUpperCase());
+    }
+  }
+  if (n < 90) return 'FAIL: 只檢查到 ' + n + ' 顆鍵（記號列的 Unicode 字形鍵應有 90 顆以上）';
+  return miss.length ? 'FAIL: 字型缺 ' + miss.join('、') : true;
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -705,6 +760,12 @@ const MUTANTS = [
   ['⑭', '少了 keyset.vowel 的文案', (w) => { delete w.locales['zh-Hant']['keyset.vowel']; delete w.locales.en['keyset.vowel']; delete w.locales.ja['keyset.vowel']; }],
   ['㉔', '上接續被去重（少了同記法的異體）', (w) => { const f = w.Lib.keysFor; w.Lib.keysFor = (c, e, id) => { const ks = f(c, e, id); const seen = {}; return id === 'ligature_u' ? ks.filter((k) => !seen[k.ins] && (seen[k.ins] = 1)) : ks; }; }],
   ['㉔', '上下接續排到接續後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 6, 'vowel', 'variant', 'bindu', 'ligature', 'ligature_u', 'ligature_l'); }],
+  ['㉔', '符號組被拿掉', (w) => { w.Lib.KEYSET_IDS.pop(); }],
+  ['㉔', '符號組少了句讀', (w) => { const c = w.catalog.categories.find((x) => x.id === 'symbol'); c.entries = c.entries.filter((e) => e.code !== '||'); const f = w.Lib.keysFromCatalog; w.Lib.keysFromCatalog = (cat, id) => f(cat, id); }],
+  ['②', '符號的字形錯一格', (w) => { w.catalog.categories.find((c) => c.id === 'symbol').entries.find((e) => e.code === '|').char = '𑗉'; }],
+  ['㊲', '符號組多一格字型沒有的字', (w) => { w.catalog.categories.find((c) => c.id === 'symbol').entries.push({ code: 'zz', char: '\u{11600}', group: 'siddham' }); }],
+  ['㊲', '字型換成一支沒有悉曇的', (w) => { w.font = Buffer.from(w.font); w.font.fill(0, 48, 60); }],
+  ['⑭', '少了 keyset.symbol 的文案', (w) => { delete w.locales['zh-Hant']['keyset.symbol']; delete w.locales.en['keyset.symbol']; delete w.locales.ja['keyset.symbol']; }],
   ['㉖', 'sprite 少一個字形', (w) => { if (w.sprite) w.sprite = w.sprite.replace(/<symbol id="cb-65d0"[^]*?<\/symbol>/, ''); else w.sprite = '<svg></svg>'; }],
   ['㉗', '盷 寫回清單上的 .th', (w) => { w.catalog.categories.find((c) => c.id === 'ligature').entries.find((e) => e.char === '盷').code = '.th'; }],
   ['㉗', '祋 排到 k.s 之後', (w) => { const es = w.catalog.categories.find((c) => c.id === 'ligature').entries; const i = es.findIndex((e) => e.char === '祋'); const [x] = es.splice(i, 1); es.push(x); }],

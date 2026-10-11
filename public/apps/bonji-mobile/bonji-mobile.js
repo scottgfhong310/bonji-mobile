@@ -123,7 +123,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     saveDraftSoon();
   }
 
-  /* ---------- 記號列（母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續） ----------
+  /* ---------- 記號列（母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續 → 符號） ----------
    * 鍵由 data/catalog.json 推出（bonji 的複製件；分類與字形是 owner 在 BonjiInput.xlsx 定的）。
    * 讀不到就在記號列上講出來——空著的記號列與「這支 app 沒有這個功能」長得一樣。 */
   function getJson(url) {
