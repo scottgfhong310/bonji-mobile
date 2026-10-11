@@ -62,6 +62,7 @@ I18n.register('en', {
   'rec.toast.confirmRemove': 'Tap again to delete record {n}',
   'rec.toast.confirmLoad': 'Tap again to load record {n} (overwrites the unsaved input)',
   'rec.toast.confirmClear': 'Tap again to clear all {n} record(s) (cannot be undone)',
+  'rec.toast.changedElsewhere': 'The list was changed in another view and has been refreshed — please check and try again',
   'rec.toast.empty': 'The list is empty — no JSON to output',
   'rec.toast.downloadFail': 'Download failed: {m}',
   'toast.downloaded': 'Downloaded: {n}',

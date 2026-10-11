@@ -62,6 +62,7 @@ I18n.register('ja', {
   'rec.toast.confirmRemove': 'もう一度押すと {n} 件目を削除します',
   'rec.toast.confirmLoad': 'もう一度押すと {n} 件目を読み込みます（未記録の入力は上書きされます）',
   'rec.toast.confirmClear': 'もう一度押すと全 {n} 件を削除します（元に戻せません）',
+  'rec.toast.changedElsewhere': '記録が別の画面で変更されたため、最新の内容に更新しました。もう一度確認してください',
   'rec.toast.empty': '記録が空のため、出力する JSON がありません',
   'rec.toast.downloadFail': 'ダウンロードに失敗しました：{m}',
   'toast.downloaded': 'ダウンロード：{n}',

@@ -19,7 +19,8 @@ import { SiddhamConverter } from "./siddham-converter.js";
   var TOOLS_KEY = 'bonji-mobile-tools';   // 'on' | 'off'；手機上預設 off（側鍵會壓在輸出右緣）
   var DRAFT_KEY = 'bonji-mobile-draft';   // { input, options }（BonjiMobileLib.normalizeDraft）
   var KEYSET_KEY = 'bonji-mobile-keyset'; // KEYSET_IDS 之一（lib）：記號列現在是哪一組
-  var REC_KEY = 'bonji-mobile-records';   // { title, items }（BonjiMobileLib.normalizeStore）：紀錄清單
+  var REC_KEY = 'bonji-mobile-records';   // { items }（BonjiMobileLib.normalizeStore）：紀錄清單——**只在增刪改某一筆時寫**
+  var REC_TITLE_KEY = 'bonji-mobile-rec-title';   // 標題欄現在的值——改標題只寫這一格，碰不到清單
 
   var converter = new SiddhamConverter();
   var setIconDone = window.SideTool.setIconDone;
@@ -38,7 +39,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
   };
 
   var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'vowel', catalog: null, elements: null, catalogFailed: false, sprite: {},
-    rec: { title: '', items: [] }, recSaveTimer: 0, storageOk: true, storageWarned: false, armed: null, armTimer: 0 };
+    rec: { title: '', items: [] }, recRaw: null, recSaveTimer: 0, storageOk: true, storageLost: false, storageWarned: false, armed: null, armTimer: 0 };
 
   /* ---------- 外殼：貼齊可見範圍 ----------
    * iOS Safari 鍵盤彈出時不縮 layout viewport、而且會把頁面往上推；只有 visualViewport
@@ -343,31 +344,68 @@ import { SiddhamConverter } from "./siddham-converter.js";
     return new SiddhamConverter(options).convert(input);
   }
 
-  function loadRecords() {
-    var raw = null, d = null;
-    try { raw = localStorage.getItem(REC_KEY); } catch (e) {}
+  function readRaw(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function parseStore(raw) {
+    var d = null;
     try { d = raw ? JSON.parse(raw) : null; } catch (e) {}
     return Lib.normalizeStore(d);
   }
 
-  function saveRecords() {
+  /* ⚠️⚠️ 標題與清單**分兩格存**，而且各自只在自己被改的時候寫〔2026-10-11，owner 回報「清除標題把原來的紀錄也清掉了」〕。
+   *    第一版是一格 { title, items }、每次整格重寫：這個畫面記憶裡的清單只要比儲存區舊
+   *    （另一個分頁、另一個還開著的畫面後來記了幾筆），在這邊改一下標題、按清除、甚至只是關掉面板，
+   *    就把那幾筆全部蓋掉（實測三條路都重現）。⇒ 改標題的路上**沒有任何一行碰得到 REC_KEY**（verify 第 ㉞ 條）。 */
+  function loadRecords() {
+    var raw = readRaw(REC_KEY);
+    var st = parseStore(raw);
+    state.recRaw = raw;
+    var t = readRaw(REC_TITLE_KEY);
+    // 舊格式把標題與清單放在同一格：新的那一格還沒有的時候沿用它
+    return { title: t != null ? Lib.normalizeTitle(t) : st.title, items: st.items };
+  }
+
+  /* 動清單之前先看儲存區：別的畫面可能已經改過它。'changed' ⇒ 記憶裡的那一份作廢，改用儲存區的
+   * （加入＝接在它後面；取代／刪除／清除的序號可能已經不對 ⇒ 呼叫端停下來、請使用者再確認一次）。
+   * 'lost'（我們寫過、現在讀不到）⇒ 儲存區不可靠，留著記憶裡的。 */
+  function syncItems() {
+    var raw = readRaw(REC_KEY);
+    var drift = Lib.storeDrift(state.recRaw, raw);
+    if (drift === 'changed') {
+      state.rec.items = parseStore(raw).items;
+      state.recRaw = raw;
+    }
+    if (drift === 'lost') {   // 存得進、讀不回 ⇒ 在面板上講，而且這一場都留著（下一次存成功不代表它之後讀得回）
+      state.storageLost = true;
+      document.getElementById('rec-storage-note').hidden = false;
+    }
+    return drift;
+  }
+
+  function saveTitle() {
     clearTimeout(state.recSaveTimer);
-    var text = JSON.stringify(state.rec);
+    try { localStorage.setItem(REC_TITLE_KEY, state.rec.title); } catch (e) {}
+  }
+  function saveTitleSoon() {
+    clearTimeout(state.recSaveTimer);
+    state.recSaveTimer = setTimeout(saveTitle, 300);
+  }
+
+  // 只有增刪改某一筆的那幾條路會走到這裡，而且它們都先 syncItems() 過
+  function saveItems() {
+    var text = JSON.stringify({ items: state.rec.items });
     var ok = false;
     try { localStorage.setItem(REC_KEY, text); ok = localStorage.getItem(REC_KEY) === text; } catch (e) {}
+    if (ok) state.recRaw = text;
     state.storageOk = ok;
-    document.getElementById('rec-storage-note').hidden = ok;
+    document.getElementById('rec-storage-note').hidden = ok && !state.storageLost;
     // 面板沒開的時候（悉曇欄底下那顆加入鈕）使用者看不到面板上那行字 ⇒ 第一次存不住時講一次
     if (!ok && !state.storageWarned && state.rec.items.length) {
       state.storageWarned = true;
       M.toast({ html: _esc(I18n.t('rec.storageFail')), classes: 'orange', displayLength: 6000 });
     }
   }
-  function saveRecordsSoon() {
-    clearTimeout(state.recSaveTimer);
-    state.recSaveTimer = setTimeout(saveRecords, 300);
-  }
-
   function currentRecord() {
     return Lib.makeRecord($recTitle.value, $input.value, readOptions(), new Date().toISOString());
   }
@@ -394,9 +432,11 @@ import { SiddhamConverter } from "./siddham-converter.js";
     var rec = currentRecord();
     if (!rec) { recToast('rec.toast.nothing', null, 'orange'); return; }
     disarm();
+    syncItems();   // 別的畫面記過新的 ⇒ 接在它們後面，不拿這邊舊的那一份蓋回去
     state.rec.items = Lib.addRecord(state.rec.items, rec);
     state.rec.title = rec.title;
-    saveRecords();
+    saveItems();
+    saveTitle();
     renderRecords();
     setIconDone(trigger);
     // 短一點：toast 在頁首上方，停太久會擋住紀錄鈕（加完常常接著就要開面板）
@@ -404,6 +444,13 @@ import { SiddhamConverter } from "./siddham-converter.js";
   }
 
   function recAction(act, i) {
+    // 清單在別的畫面被改過 ⇒ 畫面上的序號可能已經不是同一筆：先換成最新的，這一下不執行
+    if (syncItems() === 'changed') {
+      disarm();
+      renderRecords();
+      recToast('rec.toast.changedElsewhere', null, 'orange', 5000);
+      return;
+    }
     var items = state.rec.items;
     var n = i + 1;
     if (act === 'clear') {
@@ -411,7 +458,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
       if (!isArmed(act, -1)) { arm(act, -1, 'rec.toast.confirmClear', { n: items.length }); return; }
       disarm();
       state.rec.items = [];
-      saveRecords();
+      saveItems();
       renderRecords();
       recToast('rec.toast.cleared', { n: items.length }, 'grey');
       return;
@@ -429,7 +476,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
       $translit.value = it.options.transliteration;
       $ignoreSpaces.checked = it.options.ignoreSpacesAndHyphens;
       $input.value = it.input;
-      saveRecords();
+      saveTitle();
       onInput();
       M.Modal.getInstance($recModal).close();
       recToast('rec.toast.loaded', { n: n, t: titleOr(it.title) }, 'teal');
@@ -442,7 +489,8 @@ import { SiddhamConverter } from "./siddham-converter.js";
       disarm();
       state.rec.items = Lib.replaceRecord(items, i, rec);
       state.rec.title = rec.title;
-      saveRecords();
+      saveItems();
+      saveTitle();
       renderRecords();
       recToast('rec.toast.replaced', { n: n }, 'teal');
       return;
@@ -451,7 +499,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
       if (!isArmed(act, i)) { arm(act, i, 'rec.toast.confirmRemove', { n: n }); return; }
       disarm();
       state.rec.items = Lib.removeRecord(items, i);
-      saveRecords();
+      saveItems();
       renderRecords();
       recToast('rec.toast.removed', { n: n }, 'grey');
     }
@@ -462,7 +510,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     if (!$recTitle.value) return;
     $recTitle.value = '';
     state.rec.title = '';
-    saveRecords();
+    saveTitle();
     setIconDone(trigger);
     recToast('rec.toast.titleCleared', null, 'grey', 1800);
   }
@@ -554,6 +602,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
   function openRecords() {
     $input.blur();   // 先收鍵盤（同選項面板）
     disarm();
+    syncItems();   // 開面板時看到的要是儲存區現在的那一份
     renderRecords();
     M.Modal.getInstance($recModal).open();
     // modal-fixed-footer ⇒ 捲動的是 .modal-content，它會留在上次關掉時的位置；歸零要在 open() 之後（之前是 display:none）
@@ -639,7 +688,13 @@ import { SiddhamConverter } from "./siddham-converter.js";
     // 標題：邊打邊存（不改寫欄位裡的字——正規化只發生在記下來的那一刻）
     $recTitle.addEventListener('input', function () {
       state.rec.title = Lib.normalizeTitle($recTitle.value);
-      saveRecordsSoon();
+      saveTitleSoon();
+    });
+
+    // 別的分頁改了清單 ⇒ 這邊跟著換（只在「別的文件」寫入時才會收到這個事件）。key 為 null＝整個儲存區被清空
+    window.addEventListener('storage', function (e) {
+      if (e.key !== REC_KEY && e.key !== null) return;
+      if (syncItems() === 'changed') { disarm(); renderRecords(); }
     });
     // 清除標題：擋 mousedown ⇒ 焦點維持原狀——正在打標題時鍵盤留著接著打，沒在打時鍵盤不會跳出來
     var titleClear = document.getElementById('rec-title-clear');
@@ -768,7 +823,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     });
     // onCloseStart 而不是 onCloseEnd：背景分頁裡動畫不推進，End 不會來（家族 memory animation-complete-callbacks-stall）
     M.Modal.init($recModal, {
-      onCloseStart: function () { $recTitle.blur(); disarm(); saveRecords(); }
+      onCloseStart: function () { $recTitle.blur(); disarm(); saveTitle(); }   // 只收尾標題；清單只在它自己被改時寫
     });
 
     var saved = 'dark';

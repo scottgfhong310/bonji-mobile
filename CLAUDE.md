@@ -11,8 +11,8 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 33 條契約檢查
-node scripts/verify.js --selftest        # 57 個反向注入，全部必須被抓到
+npm run verify                           # 34 條契約檢查
+node scripts/verify.js --selftest        # 64 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
 python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時宣告 capabilities {downloads: true}
 ```
@@ -51,7 +51,10 @@ public/apps/bonji-mobile/
 11. **紀錄清單的標題不是鍵**〔owner 2026-10-11〕：可以重複、可以留空（一部咒語分好幾段記）——**不要加查重、覆寫或合併**；同名各段靠順序分開（輸出的 `part`）。第 ㉙ 條。
 12. **紀錄清單只存 input 與選項，輸出現算**（每一筆用它自己的選項，第 ㉚ 條）；清單在 `localStorage`——**方便，不是備份**，存完讀回比對、存不住要在畫面上講（第 ㉝ 條）。
 13. **不要用 `confirm()`／`alert()`**：Artifacts 的 iframe 裡直接回 false。會毀掉東西的動作一律「再按一次」（`arm()`，第 ㉜ 條）。
-14. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
+14. ⚠️⚠️ **改標題的路上不可以有任何一行寫清單**〔2026-10-11 實際弄丟過 owner 的紀錄〕：標題存 `bonji-mobile-rec-title`、清單存 `bonji-mobile-records`，**兩格分開、各自只在自己被改時寫**；
+    會寫清單的只有 `addCurrent`／`recAction`，而且都先 `syncItems()`（別的畫面改過就以儲存區為準）。**不要為了省事加一支「整份存檔」**——
+    一個比較舊的畫面呼叫它一次，別處後來記的紀錄就全部被蓋掉，而畫面上什麼都不會報。第 ㉞ 條（DESIGN §10.3）。
+15. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
 
 ## 複製件登記
 

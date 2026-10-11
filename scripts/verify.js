@@ -519,11 +519,45 @@ check('㉜ 紀錄面板在手機上：加入不收鍵盤／不放大／不用 co
 check('㉝ 清單存不住要講出來；下載檔名與圖示', (w) => {
   const miss = [];
   if (!/localStorage\.setItem\(REC_KEY, text\); ok = localStorage\.getItem\(REC_KEY\) === text;/.test(w.js)) miss.push('存完沒有讀回來比對');
-  if (!/getElementById\('rec-storage-note'\)\.hidden = ok;/.test(w.js)) miss.push('存不住時面板上不講');
+  if (!/getElementById\('rec-storage-note'\)\.hidden = ok && !state\.storageLost;/.test(w.js)) miss.push('存不住時面板上不講');
   if (!/id="rec-storage-note"[^>]*data-i18n="rec\.storageFail"/.test(w.html)) miss.push('面板上沒有那一行');
   const name = w.Lib.exportFilename(new Date(2026, 9, 11, 9, 5, 7));
   if (name !== 'bonji-mobile-20261011090507.json') miss.push('檔名 ' + name);
   if (!/id="rec-download"[^>]*>\s*<i class="material-icons left">file_download<\/i>/.test(w.html)) miss.push('下載鈕的圖不是 file_download');
+  return miss.length ? 'FAIL: ' + miss.join('、') : true;
+});
+
+// ㉞ **改標題不可以碰清單；動清單之前先看儲存區**〔2026-10-11，owner 回報「清除標題把原來的紀錄也清掉了」〕。
+//    第一版把標題與清單存在同一格、每次整格重寫：一個記憶裡的清單比儲存區舊的畫面（另一個分頁、另一個還開著的畫面後來記了幾筆），
+//    只要改標題、按清除、甚至關掉面板，就把那幾筆蓋掉。⇒ (a) 兩格分開存；(b) 改標題的三條路上沒有任何一行寫清單；
+//    (c) 寫清單的每一條路都先 syncItems()；(d) 「讀不到」不可以當成「被清空了」（storeDrift 的 lost）。
+const fnBody = (src, name) => (src.match(new RegExp('\\n  function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n  \\}')) || [''])[0];
+check('㉞ 改標題不碰清單；動清單前先看儲存區', (w) => {
+  const miss = [];
+  const d = w.Lib.storeDrift;
+  if (!(d(null, null) === 'same' && d('a', 'a') === 'same' && d('a', 'b') === 'changed' && d(null, 'b') === 'changed' && d('a', null) === 'lost' && d('a', undefined) === 'lost')) miss.push('storeDrift 的判定不對');
+  const k1 = (w.js.match(/var REC_KEY = '([^']+)'/) || [])[1], k2 = (w.js.match(/var REC_TITLE_KEY = '([^']+)'/) || [])[1];
+  if (!k1 || !k2 || k1 === k2) miss.push('標題與清單不是分兩格存（' + k1 + '／' + k2 + '）');
+  // 改標題的路：clearTitle、saveTitle、標題欄的 input、面板關閉——都不可以出現 saveItems 或 REC_KEY
+  const titlePaths = {
+    clearTitle: fnBody(w.js, 'clearTitle'),
+    saveTitle: fnBody(w.js, 'saveTitle'),
+    '標題欄 input': (w.js.match(/\$recTitle\.addEventListener\('input', function \(\) \{[\s\S]*?\n    \}\);/) || [''])[0],
+    '面板關閉': (w.js.match(/M\.Modal\.init\(\$recModal, \{[\s\S]*?\n    \}\);/) || [''])[0]
+  };
+  for (const [name, body] of Object.entries(titlePaths)) {
+    if (!body) miss.push('找不到 ' + name);
+    else if (/saveItems\(|REC_KEY\b/.test(body)) miss.push(name + ' 寫到清單了');
+  }
+  if (!/JSON\.stringify\(\{ items: state\.rec\.items \}\)/.test(fnBody(w.js, 'saveItems'))) miss.push('saveItems 寫的不是只有 items');
+  // 寫清單的路：加入（先同步再接上去）、recAction（別處改過就停下來）
+  const add = fnBody(w.js, 'addCurrent');
+  if (!(add.indexOf('syncItems()') > 0 && add.indexOf('syncItems()') < add.indexOf('Lib.addRecord('))) miss.push('加入之前沒有先看儲存區');
+  const act = fnBody(w.js, 'recAction');
+  if (!/^\s*function recAction\(act, i\) \{\s*(\/\/[^\n]*\n\s*)*if \(syncItems\(\) === 'changed'\) \{[\s\S]*?return;\s*\}/.test(act.replace(/^\n/, ''))) miss.push('取代／刪除／清除之前沒有先看儲存區');
+  const callers = [...w.js.matchAll(/\n  function (\w+)\([^)]*\) \{[\s\S]*?\n  \}/g)].filter((m) => /saveItems\(\)/.test(m[0]) && m[1] !== 'saveItems').map((m) => m[1]).sort().join(',');
+  if (callers !== 'addCurrent,recAction') miss.push('會寫清單的函式變了：' + callers);
+  if (!/addEventListener\('storage'/.test(w.js)) miss.push('沒有聽 storage 事件');
   return miss.length ? 'FAIL: ' + miss.join('、') : true;
 });
 
@@ -608,6 +642,13 @@ const MUTANTS = [
   ['㉜', '標題欄有焦點時也更新鍵盤基準', (w) => { w.js = w.js.replace(' && document.activeElement !== $recTitle) state.baseline', ') state.baseline'); }],
   ['㉝', '存完不讀回比對', (w) => { w.js = w.js.replace('ok = localStorage.getItem(REC_KEY) === text;', 'ok = true;'); }],
   ['㉝', '下載檔名不補零', (w) => { w.Lib.exportFilename = (d) => 'bonji-mobile-' + d.getFullYear() + (d.getMonth() + 1) + d.getDate() + d.getHours() + d.getMinutes() + d.getSeconds() + '.json'; }],
+  ['㉞', '清除標題又去寫清單', (w) => { w.js = w.js.replace("    state.rec.title = '';\n    saveTitle();", "    state.rec.title = '';\n    saveItems();\n    saveTitle();"); }],
+  ['㉞', '關掉面板時整份重寫', (w) => { w.js = w.js.replace('disarm(); saveTitle(); }   //', 'disarm(); saveItems(); saveTitle(); }   //'); }],
+  ['㉞', '標題與清單又存回同一格', (w) => { w.js = w.js.replace("var REC_TITLE_KEY = 'bonji-mobile-rec-title'", "var REC_TITLE_KEY = 'bonji-mobile-records'"); }],
+  ['㉞', '清單裡又帶著標題整格寫', (w) => { w.js = w.js.replace('JSON.stringify({ items: state.rec.items })', 'JSON.stringify(state.rec)'); }],
+  ['㉞', '加入之前不看儲存區', (w) => { w.js = w.js.replace('    syncItems();   // 別的畫面記過新的', '    // 別的畫面記過新的'); }],
+  ['㉞', '刪除／取代不管別處改過', (w) => { w.js = w.js.replace("if (syncItems() === 'changed') {\n      disarm();\n      renderRecords();\n      recToast", "if (false) {\n      disarm();\n      renderRecords();\n      recToast"); }],
+  ['㉞', '讀不到被當成清單被清空', (w) => { w.Lib.storeDrift = (a, b) => (a === b ? 'same' : 'changed'); }],
   ['⑭', '紀錄的 toast 用了未定義的 key', (w) => { w.js = w.js.replace("recToast('rec.toast.replaced'", "recToast('rec.toast.replacedX'"); }]
 ];
 

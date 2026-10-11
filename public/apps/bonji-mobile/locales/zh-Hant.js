@@ -62,6 +62,7 @@ I18n.register('zh-Hant', {
   'rec.toast.confirmRemove': '再按一次：刪除第 {n} 筆',
   'rec.toast.confirmLoad': '再按一次：載回第 {n} 筆（會蓋掉輸入框裡還沒記下的內容）',
   'rec.toast.confirmClear': '再按一次：清除全部 {n} 筆（無法復原）',
+  'rec.toast.changedElsewhere': '清單在別的畫面被改過，已換成最新的——請再確認一次',
   'rec.toast.empty': '清單是空的，沒有可輸出的 JSON',
   'rec.toast.downloadFail': '下載失敗：{m}',
   'toast.downloaded': '已下載：{n}',

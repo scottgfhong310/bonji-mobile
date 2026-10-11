@@ -18,13 +18,14 @@
  *   normalizeTitle(t)          → 標題的單行版本（**可以是空的、可以重複**）
  *   makeRecord(t, i, o, iso)   → 一筆紀錄 `{ title, input, options, savedAt }`；input 是空的回 null
  *   normalizeStore(s)          → { title, items } —— 紀錄清單（從 localStorage 讀回來的不可信）
+ *   storeDrift(last, now)      → 'same' | 'changed' | 'lost' —— 儲存區裡的清單與這個畫面上次看到的比起來怎麼了
  *   addRecord／replaceRecord／removeRecord(items, …) → 新陣列（不改輸入）
  *   buildExport(items, convert, iso) → JSON 輸出的那個物件（輸出是匯出當下**算出來的**，不落地）
  *   exportFilename(date)       → `bonji-mobile-yyyyMMddHHmmss.json`
  *
  * 資料格式：catalog `{ categories: [{ id, entries: [{ code, char, group }] }] }`（bonji 的 BonjiInput.xlsx 匯出）；
  *           草稿 `{ input: string, options: { inputMethod, transliteration, ignoreSpacesAndHyphens } }`；
- *           紀錄清單 `{ title: string, items: [{ title, input, options, savedAt }] }`（title＝標題欄現在的值）；
+ *           紀錄清單 `{ items: [{ title, input, options, savedAt }] }`（標題欄的值另存一格，見控制器；舊格式的 `title` 仍讀得懂）；
  *           JSON 輸出 `{ app, exportedAt, count, records: [{ seq, part, title, options, input, output, savedAt }] }`。
  * 後端 API：無（零後端，DATABASE_GUIDELINES §0 的第 0 層）。
  */
@@ -203,6 +204,18 @@
     return { title: normalizeTitle(s.title), items: items };
   }
 
+  /* 儲存區裡的清單（原始字串）與「這個畫面上次讀到／寫下的那一份」比：
+   *   same    —— 沒人動過，照記憶裡的做
+   *   changed —— 別的畫面（另一個分頁、另一個還開著的畫面）改過 ⇒ **以儲存區為準**，不可以拿記憶裡那份舊的蓋回去
+   *   lost    —— 我們寫過、現在讀不到（儲存區不可靠）⇒ 留著記憶裡的，不可以當成「清單被清空了」
+   * ⚠️〔2026-10-11 實際發生〕第一版把標題與清單存在同一格、每次整格重寫——一個比較舊的畫面只要改一下標題
+   *    （或只是關掉面板），就把別處後來記的紀錄全部蓋掉。 */
+  function storeDrift(lastRaw, nowRaw) {
+    if (nowRaw === lastRaw) return 'same';
+    if (typeof nowRaw !== 'string') return 'lost';
+    return 'changed';
+  }
+
   function addRecord(items, rec) {
     return rec ? items.concat([rec]) : items.slice();
   }
@@ -276,6 +289,7 @@
     normalizeTitle: normalizeTitle,
     makeRecord: makeRecord,
     normalizeStore: normalizeStore,
+    storeDrift: storeDrift,
     addRecord: addRecord,
     replaceRecord: replaceRecord,
     removeRecord: removeRecord,
