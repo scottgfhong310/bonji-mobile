@@ -3,7 +3,7 @@ I18n.register('ja', {
   'title.page': '悉曇（梵字）・モバイル',
   'app.title': '悉曇（梵字）・モバイル',
   'input.placeholder': '例：siddha;m',
-  'input.hint': '記法：<code>;m</code>＝ṁ、<code>.h</code>＝ḥ、<code>~m</code>＝m̐、長母音 <code>aa</code>＝ā、<code>ii</code>＝ī、<code>uu</code>＝ū。下の記号列からワンタップで挿入でき、入力欄の右で母音／異体字／接続／体文／上下接続／記号を切り替えます。',
+  'input.hint': '記法：<code>;m</code>＝ṁ、<code>.h</code>＝ḥ、<code>~m</code>＝m̐、長母音 <code>aa</code>＝ā、<code>ii</code>＝ī、<code>uu</code>＝ū。スペース3回で全角スペース 1 つ。下の記号列からワンタップで挿入でき、入力欄の右で母音／異体字／接続／体文／上下接続／記号を切り替えます。',
   'examples.label': '例：',
   'keybar.label': '記号（ワンタップ挿入）',
   'opt.title': 'オプション',
