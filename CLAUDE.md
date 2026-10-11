@@ -11,8 +11,8 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 35 條契約檢查
-node scripts/verify.js --selftest        # 71 個反向注入，全部必須被抓到
+npm run verify                           # 36 條契約檢查
+node scripts/verify.js --selftest        # 76 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
 python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時的 capabilities 見建置結尾印出的那一行（downloads ＋ db）
 ```
@@ -22,6 +22,7 @@ python3 artifact/build.py                # Artifacts 版 → artifact/dist/（�
 ```
 app.js                                   # 只有 static ＋ / → 302 ＋ JSON 404（無 API）
 scripts/verify.js                        # 契約檢查 ＋ --selftest
+scripts/backup-artifact.sh               # Artifacts 資料庫的紀錄清單 → 本機＋iCloud（每日排程與發佈前都走它；見檔頭）
 artifact/{build.py, vendor/materialize.min.css}   # Artifacts 版建置（差異全在 PATCHES）
 artifact/src/remote-db.js                # ⚠️ 只有 Artifacts 版有：紀錄清單存 artifact 的資料庫（一筆一份文件）
 public/apps/bonji-mobile/
@@ -74,11 +75,18 @@ public/apps/bonji-mobile/
 
 <https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG>（private）。**改了前端要更新**，順序固定：
 
-1. ⚠️ **先備份資料庫裡的清單**〔owner 2026-10-11：「每次更新的時候先備份」〕：`ArtifactData` `list` `records`（`out_dir` 指到下面那個資料夾）＋ `get` `state`／`title`。
-   備份放 **`/Users/Shared/nodeapp-db-backup/bonji-mobile-artifact/<yyyyMMdd-HHmmss>/`**（repo 之外——本 repo 是 public，owner 記的內容不進版控）。
-   清單是空的也要留一個資料夾（寫一個 `EMPTY.txt`）：**「備份過、當時是空的」與「沒備份」要分得出來**。
+1. ⚠️ **先備份資料庫裡的清單**〔owner 2026-10-11：「每次更新的時候先備份」〕——兩個動作，與每日排程走同一支腳本：
+   `ArtifactData` `list` `records`（`query: {limit: 1000}`、`out_dir: /Users/Shared/nodeapp-db-backup/bonji-mobile-artifact/.pull`），記下它回報的筆數 N；
+   再跑 `BM_BACKUP_CLOUD=- scripts/backup-artifact.sh /Users/Shared/nodeapp-db-backup/bonji-mobile-artifact/.pull N`
+   （`BM_BACKUP_CLOUD=-`＝這次不寫 iCloud：那邊的檔只有排程覆寫得了）。**exit 不是 0 就不要發佈。**
+   備份落在 `/Users/Shared/nodeapp-db-backup/bonji-mobile-artifact/`（repo 之外——本 repo 是 public，owner 記的內容不進版控）；
+   清單是空的時候腳本不寫新檔，只在 `backup.log` 留一行（「備份過、當時是空的」與「沒備份」因此分得出來）。
 2. 重跑 `build.py`（結尾印出要宣告的 capabilities）。
 3. 以 Artifact 工具重新發佈 `artifact/dist/`（先 `read` 一次）。`capabilities` 不帶＝沿用上一版；**要改就整組重給**（沒重給的會被撤掉）。
 4. 發佈後再 `list` 一次 `records`，筆數要與第 1 步相同——**更新不該動到資料**。
+
+**每日排程**〔owner 2026-10-11：「比照 coffee-deposit」〕：`~/.claude/scheduled-tasks/bonji-mobile-artifact-backup`（每天 21:10 前後；桌面 app 開著才跑，沒開就下次啟動補跑）。
+它只做兩件事——取回 `records`、呼叫 `scripts/backup-artifact.sh`；對帳、驗證、輪替（本機留最近 7 個**不同的狀態**）、iCloud 的 slot<星期> 副本、log 都在腳本裡。
+**判斷成敗看 `backup.log` 最後一段與 `LAST-SUCCESS.txt`**；⚠️ 排程被停用時的症狀是「什麼都沒發生」，與「一切正常」在磁碟上長得一樣。
 
 現在宣告的是 `downloads`（JSON 下載；沙盒會擋掉 `<a download>`）＋ `db`（紀錄清單；規則 `read`／`write` 都是 `owner`）。

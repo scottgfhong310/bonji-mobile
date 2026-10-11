@@ -42,6 +42,7 @@ async function loadWorld() {
     // Artifacts 版才有的兩個檔：紀錄清單的同步（㉟）
     remote: read(path.join(REPO, 'artifact', 'src', 'remote-db.js')),
     build: read(path.join(REPO, 'artifact', 'build.py')),
+    backup: read(path.join(REPO, 'scripts', 'backup-artifact.sh')),
     locales: {}
   };
   for (const code of ['zh-Hant', 'en', 'ja']) w.locales[code] = loadLocale(path.join(APP, 'locales', code + '.js'));
@@ -605,6 +606,49 @@ check('㉟ Artifacts 版：清單存資料庫、一筆一份文件', (w) => {
   return miss.length ? 'FAIL: ' + miss.join('、') : true;
 });
 
+// ㊱ 備份腳本（scripts/backup-artifact.sh）——**在暫存資料夾裡真的跑**，不是看它的字面：
+//    (a) 空的清單是合法的，但不寫新檔、不輪替（連續空的清單不可以把最後一份有內容的備份擠掉）
+//    (b) 磁碟上的檔數 ≠ 呼叫端報的筆數 ⇒ exit 1、既有備份不動（取回不完整，或混進上一次留下的檔）
+//    (c) 不合格的文件 ⇒ exit 1、隔離、既有備份不動；(d) 內容與上一份相同 ⇒ 不另存；(e) 用完把取回來的檔清掉
+check('㊱ 備份腳本：空的不輪替／檔數要對得上／壞的不覆蓋好的', (w) => {
+  const os = require('os');
+  const { spawnSync } = require('child_process');
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bm-backup-'));
+  try {
+    // 腳本以它自己的位置找 lib ⇒ 在暫存區擺出同樣的相對位置（lib 用世界裡那一份，selftest 改得到）
+    const sdir = path.join(tmp, 'repo', 'scripts'), ldir = path.join(tmp, 'repo', 'public', 'apps', 'bonji-mobile');
+    fs.mkdirSync(sdir, { recursive: true }); fs.mkdirSync(ldir, { recursive: true });
+    const script = path.join(sdir, 'backup-artifact.sh');
+    fs.writeFileSync(script, w.backup, { mode: 0o755 });
+    fs.writeFileSync(path.join(ldir, 'bonji-mobile-lib.js'), w.libSrc);
+    const root = path.join(tmp, 'root'), pull = path.join(tmp, 'pull'), rec = path.join(pull, 'records');
+    fs.mkdirSync(rec, { recursive: true });
+    const env = Object.assign({}, process.env, { BM_BACKUP_ROOT: root, BM_BACKUP_CLOUD: '-', BM_BACKUP_NOTIFY: '0' });
+    const put = (id, input, order) => fs.writeFileSync(path.join(rec, id + '.json'), JSON.stringify({ title: 't', input, options: {}, savedAt: 'S', order }));
+    const run = (n) => spawnSync('sh', [script, pull, String(n)], { env, encoding: 'utf8' }).status;
+    const backups = () => (fs.existsSync(root) ? fs.readdirSync(root).filter((f) => /^bonji-mobile-artifact-.*\.json$/.test(f)).sort() : []);
+    const newest = () => JSON.parse(fs.readFileSync(path.join(root, backups().slice(-1)[0]), 'utf8'));
+    const bad = [];
+    if (run(0) !== 0 || backups().length !== 0) bad.push('空的清單寫出了備份檔，或沒有 exit 0');
+    put('r2', 'ra tna', 20); put('r1', 'na mo', 10);
+    if (run(2) !== 0 || backups().length !== 1) bad.push('兩筆的清單沒有備份成功');
+    else if (newest().records.map((r) => r.id + ':' + r.input).join(' ') !== 'r1:na mo r2:ra tna') bad.push('備份檔的內容或順序不對');
+    if (fs.readdirSync(rec).length !== 0) bad.push('取回來的檔沒有清掉（下一次會混進來）');
+    // ⚠️ 不能只數檔案：檔名只到秒，同一秒內另存會蓋掉同名的那一份、數量不變（selftest 抓到的）⇒ 比檔案裡的 pulledAt（毫秒）
+    const before = backups().length === 1 ? newest().pulledAt : '';
+    put('r2', 'ra tna', 20); put('r1', 'na mo', 10);
+    if (run(2) !== 0 || backups().length !== 1 || newest().pulledAt !== before) bad.push('內容相同卻另存了一份');
+    put('r1', 'na mo', 10);
+    if (run(2) !== 1 || backups().length !== 1) bad.push('檔數對不上卻沒有失敗');
+    put('r1', 'na mo', 10); fs.writeFileSync(path.join(rec, 'bad.json'), JSON.stringify({ title: 'x', order: 5 }));
+    if (run(2) !== 1 || backups().length !== 1 || newest().count !== 2) bad.push('不合格的文件沒有被擋下，或動到了既有備份');
+    if (run(0) !== 0 || backups().length !== 1 || newest().count !== 2) bad.push('之後空的清單動到了既有備份');
+    return bad.length ? 'FAIL: ' + bad.join('、') : true;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -700,6 +744,11 @@ const MUTANTS = [
   ['㉟', '資料庫作主時又寫回 localStorage', (w) => { w.js = w.js.replace("    if (remoteOn()) return;   // 同上", "    // 同上"); }],
   ['㉛', '讀回的 id 不驗證（會被拿去當文件路徑）', (w) => { const f = w.Lib.normalizeStore; w.Lib.normalizeStore = (s) => { const o = f(s); ((s && s.items) || []).forEach((r, i) => { if (o.items[i] && r && r.id) o.items[i].id = r.id; }); return o; }; }],
   ['㉟', '規則放寬成任何看得到的人都能讀', (w) => { w.build = w.build.replace('"read": "owner"', '"read": "view"'); }],
+  ['㊱', '空的清單也寫一份（七天後把有內容的擠掉）', (w) => { w.backup = w.backup.replace('if [ "$FOUND" = "0" ]; then', 'if [ "$FOUND" = "never" ]; then'); }],
+  ['㊱', '不對帳檔數', (w) => { w.backup = w.backup.replace('if [ "$FOUND" != "$EXPECT" ]; then', 'if [ "$FOUND" = "never" ]; then'); }],
+  ['㊱', '驗證沒過照樣寫出', (w) => { w.backup = w.backup.replace('if (items.length !== raw.length) throw', 'if (false) throw'); }],
+  ['㊱', '內容相同也另存一份', (w) => { w.backup = w.backup.replace('same = !bits.length;', 'same = false;'); }],
+  ['㊱', '用完不清取回來的檔', (w) => { w.backup = w.backup.replace(/\ncleanup_pull\n\n# ─+ ④/, '\n\n# ④'); }],
   ['⑭', '紀錄的 toast 用了未定義的 key', (w) => { w.js = w.js.replace("recToast('rec.toast.replaced'", "recToast('rec.toast.replacedX'"); }]
 ];
 
