@@ -147,11 +147,17 @@
   <div id="records-modal" class="modal bottom-sheet modal-fixed-footer records-sheet">
     <div class="modal-content">
       <h2 class="sheet-title" data-i18n="rec.title">紀錄・JSON 輸出</h2>
-      <label class="opt-field">
-        <span class="opt-label" data-i18n="rec.titleLabel">標題（可留空、可重複）</span>
-        <input type="text" id="rec-title" class="rec-title" autocomplete="off" autocorrect="off" spellcheck="false"
-          data-i18n-placeholder="rec.titlePlaceholder" placeholder="例如：大悲咒" />
-      </label>
+      <!-- 外層是 div 不是 label：清除鈕放在 label 裡的話，按它會連帶觸發 label 的預設動作（聚焦標題欄＝鍵盤彈出來） -->
+      <div class="opt-field">
+        <label class="opt-label" for="rec-title" data-i18n="rec.titleLabel">標題（可留空、可重複）</label>
+        <div class="rec-title-row">
+          <input type="text" id="rec-title" class="rec-title" autocomplete="off" autocorrect="off" spellcheck="false"
+            data-i18n-placeholder="rec.titlePlaceholder" placeholder="例如：大悲咒" />
+          <a href="#!" id="rec-title-clear" class="rec-btn rec-danger" data-i18n-title="rec.clearTitle" title="清除標題">
+            <i class="material-icons">clear</i>
+          </a>
+        </div>
+      </div>
       <div class="rec-current">
         <div class="rec-current-body">
           <span class="opt-label" data-i18n="rec.current">目前的輸入</span>

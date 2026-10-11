@@ -34,6 +34,8 @@ I18n.register('ja', {
   'rec.title': '記録・JSON 出力',
   'rec.titleLabel': 'タイトル（空欄・重複可——同じ真言の各段には同じタイトルを使います）',
   'rec.titlePlaceholder': '例：大悲咒',
+  'rec.clearTitle': 'タイトルをクリア',
+  'rec.toast.titleCleared': 'タイトルをクリアしました',
   'rec.current': '現在の入力',
   'rec.currentEmpty': '入力は空です',
   'rec.add': '追加',

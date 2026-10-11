@@ -457,6 +457,16 @@ import { SiddhamConverter } from "./siddham-converter.js";
     }
   }
 
+  // 只清標題欄（清單裡已經記下的各筆不動）。本來就是空的就什麼都不做——不跳一個「已清除」騙人（同 clearInput）
+  function clearTitle(trigger) {
+    if (!$recTitle.value) return;
+    $recTitle.value = '';
+    state.rec.title = '';
+    saveRecords();
+    setIconDone(trigger);
+    recToast('rec.toast.titleCleared', null, 'grey', 1800);
+  }
+
   // 面板上「目前的輸入」那一格＝按「加入清單」會記下的那一段（空的時候加入鈕停用）
   function renderRecCurrent() {
     var box = document.getElementById('rec-current');
@@ -631,6 +641,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
       state.rec.title = Lib.normalizeTitle($recTitle.value);
       saveRecordsSoon();
     });
+    // 清除標題：擋 mousedown ⇒ 焦點維持原狀——正在打標題時鍵盤留著接著打，沒在打時鍵盤不會跳出來
+    var titleClear = document.getElementById('rec-title-clear');
+    titleClear.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    titleClear.addEventListener('click', function (e) { e.preventDefault(); clearTitle(titleClear); });
     $recTitle.addEventListener('keydown', function (e) {
       if (e.key === 'Enter') { e.preventDefault(); $recTitle.blur(); }   // 單行欄位：Enter＝打完了，收鍵盤
     });

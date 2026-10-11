@@ -499,6 +499,11 @@ check('㉜ 紀錄面板在手機上：加入不收鍵盤／不放大／不用 co
   const f = sblk.indexOf('class="out-foot"'), q = sblk.indexOf('id="rec-add-quick"');
   if (!(f >= 0 && f < q)) miss.push('加入鈕不在悉曇欄的 .out-foot 裡');
   if (!/input\[type="text"\]\.rec-title\s*\{[^}]*font-size:\s*var\(--ctl-font\)/.test(w.css)) miss.push('標題欄沒用 --ctl-font');
+  // 標題欄旁的清除鈕〔owner 2026-10-11〕：同樣擋 mousedown（焦點維持原狀）；它不可以包在 <label> 裡——label 的預設動作會把焦點送進標題欄、鍵盤跳出來
+  if (!/titleClear\.addEventListener\('mousedown',[^\n]*preventDefault\(\)/.test(w.js)) miss.push('標題的清除鈕沒擋 mousedown');
+  const ci = w.html.indexOf('id="rec-title-clear"');
+  if (ci < 0) miss.push('標題欄旁沒有清除鈕');
+  else if (w.html.lastIndexOf('<label', ci) > w.html.lastIndexOf('</label>', ci)) miss.push('清除鈕包在 <label> 裡');
   const code = w.js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   if (/(^|[^.\w$])(confirm|alert|prompt)\s*\(|window\.(confirm|alert|prompt)\s*\(/m.test(code)) miss.push('用了 confirm／alert／prompt');
   const sheet = (w.html.match(/<div id="records-modal"[\s\S]*?\n  <\/div>\n/) || [''])[0];
@@ -595,6 +600,8 @@ const MUTANTS = [
   ['㉛', '讀回的清單不驗證', (w) => { w.Lib.normalizeStore = (s) => s || { title: '', items: [] }; }],
   ['㉜', '加入鈕不擋 mousedown', (w) => { w.js = w.js.replace("quick.addEventListener('mousedown'", "quick.addEventListener('pointerup'"); }],
   ['㉜', '加入鈕搬到頁首', (w) => { const m = w.html.match(/          <a href="#!" id="rec-add-quick"[\s\S]*?<\/a>\n/); w.html = w.html.replace(m[0], '').replace('<a href="#!" id="open-options"', m[0] + '<a href="#!" id="open-options"'); }],
+  ['㉜', '標題的清除鈕不擋 mousedown', (w) => { w.js = w.js.replace("titleClear.addEventListener('mousedown'", "titleClear.addEventListener('pointerup'"); }],
+  ['㉜', '清除鈕包回 <label> 裡', (w) => { w.html = w.html.replace('<div class="rec-title-row">', '<label class="rec-title-row">').replace(/(id="rec-title-clear"[\s\S]*?<\/a>\n\s*)<\/div>/, '$1</label>'); }],
   ['㉜', '標題欄字級寫死 16px', (w) => { w.css = w.css.replace(/(input\[type="text"\]\.rec-title\s*\{[^}]*font-size:\s*)var\(--ctl-font\)/, '$116px'); }],
   ['㉜', '刪除改用 confirm()', (w) => { w.js = w.js.replace("if (!isArmed(act, i)) { arm(act, i, 'rec.toast.confirmRemove', { n: n }); return; }", "if (!confirm('delete?')) return;"); }],
   ['㉜', 'JSON 排到標題欄上面', (w) => { w.html = w.html.replace('id="rec-title"', 'id="__t__"').replace('id="rec-json"', 'id="rec-title"').replace('id="__t__"', 'id="rec-json"'); }],

@@ -34,6 +34,8 @@ I18n.register('en', {
   'rec.title': 'Records · JSON output',
   'rec.titleLabel': 'Title (optional, may repeat — use the same title for every part of one mantra)',
   'rec.titlePlaceholder': 'e.g. Great Compassion Mantra',
+  'rec.clearTitle': 'Clear title',
+  'rec.toast.titleCleared': 'Title cleared',
   'rec.current': 'Current input',
   'rec.currentEmpty': 'The input is empty',
   'rec.add': 'Add',

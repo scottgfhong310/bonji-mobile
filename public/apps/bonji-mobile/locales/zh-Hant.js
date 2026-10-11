@@ -34,6 +34,8 @@ I18n.register('zh-Hant', {
   'rec.title': '紀錄・JSON 輸出',
   'rec.titleLabel': '標題（可留空、可重複——同一部咒語的各段用同一個標題）',
   'rec.titlePlaceholder': '例如：大悲咒',
+  'rec.clearTitle': '清除標題',
+  'rec.toast.titleCleared': '已清除標題',
   'rec.current': '目前的輸入',
   'rec.currentEmpty': '輸入是空的',
   'rec.add': '加入清單',

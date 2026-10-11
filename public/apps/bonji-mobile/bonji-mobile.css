@@ -518,9 +518,19 @@ code {
 /* 標題欄：Materialize 原生底線式輸入。⚠️ 字級走 --ctl-font（≥16px，否則 iOS 聚焦時放大整頁；第 ⑩ 條）。
  * 0,3,1 贏過 Materialize 的 input[type=text]:not(.browser-default)（0,2,1）。 */
 .records-sheet input[type="text"].rec-title {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: var(--ctl-font);
   margin: 0;
 }
+/* 標題欄＋清除鈕並排。⚠️ 不替 input 加 padding 塞 icon：Materialize 的 input 是 content-box，會被撐出欄寬 */
+.rec-title-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+/* 面板裡的 label 不走 Materialize 的浮動 label 樣式（它只對 .input-field 底下的生效），字級與顏色照 .opt-label */
+.records-sheet label.opt-label { color: var(--muted); font-size: .85rem; }
 
 /* 「目前的輸入」＋ 加入鈕 */
 .rec-current {
