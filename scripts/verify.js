@@ -234,6 +234,8 @@ check('⑭ i18n key 齊全', (w) => {
   const used = new Set();
   for (const m of w.html.matchAll(/data-i18n(?:-html|-title|-placeholder|-doctitle)?="([^"]+)"/g)) used.add(m[1]);
   for (const m of w.js.matchAll(/I18n\.t\('([^']+)'\s*[,)]/g)) used.add(m[1]);   // 只收完整字面值；'keyset.' + x 這種前綴另列於下
+  // 紀錄清單那一段的 key 是經 recToast／arm／recButton 的參數傳進 I18n.t 的 ⇒ 上面那條只認 I18n.t('…') 的規則看不到它們
+  for (const m of w.js.matchAll(/'((?:rec|toast)\.[A-Za-z.]+)'/g)) used.add(m[1]);
   used.add('tool.more');   // side-tool.js 動態產生 #setting-more 時掛的（DESIGN_GUIDELINES §6）
   for (const id of w.Lib.KEYSET_IDS) used.add('keyset.' + id);   // I18n.t('keyset.' + state.keyset)
   const miss = [...used].filter((k) => !(k in dict));
@@ -415,6 +417,111 @@ check('㉘ Noto 與 CBETA 完整字母同大', (w) => {
   return g[1] === c[1] || 'FAIL: 字號 ' + g[1] + 'px ≠ SVG 高 ' + c[1] + 'px';
 });
 
+// ㉙ 紀錄清單：**標題可以重複、可以留空**〔owner 2026-10-11：一部咒語分好幾段記，每一段掛同一個標題〕。
+//    標題不是鍵 ⇒ 加入不查重、不覆寫；同名各段靠順序分開（輸出的 part＝同一個標題裡第幾段，seq＝整份清單第幾筆）。
+check('㉙ 紀錄：標題可以重複、可以留空，part 依標題分段', (w) => {
+  const L = w.Lib, o = L.DEFAULT_OPTIONS;
+  const mk = (t, i) => L.makeRecord(t, i, o, 'S');
+  const bad = [];
+  const recs = [mk('大悲咒', 'na mo'), mk('  大悲咒 ', 'ra tna'), mk('', 'huu~m'), mk('心經咒', 'ga te'), mk('大悲咒', 'tra yaa ya'), mk('__proto__', 'a'), mk('__proto__', 'aa')];
+  if (recs.some((r) => !r)) return 'FAIL: 有標題／空標題的紀錄建不出來';
+  let items = [];
+  for (const r of recs) {
+    const before = items;
+    items = L.addRecord(items, r);
+    if (items === before || before.length !== items.length - 1) bad.push('addRecord 改了傳進來的陣列，或沒有多一筆');
+  }
+  if (items.length !== 7) bad.push('同名的被併掉了：' + items.length + ' 筆（應為 7）');
+  if (recs[1].title !== '大悲咒') bad.push('標題前後的空白沒去掉');
+  if (mk('x', '   ') !== null || mk('x', 5) !== null) bad.push('空的輸入也記成一筆');
+  const exp = L.buildExport(items, () => ({ siddham: 's', latin: 'l', ascii: 'a', codepoints: 'c' }), 'T');
+  const got = exp.records.map((r) => r.seq + ':' + r.title + ':' + r.part).join(' ');
+  const want = '1:大悲咒:1 2:大悲咒:2 3::1 4:心經咒:1 5:大悲咒:3 6:__proto__:1 7:__proto__:2';
+  if (got !== want) bad.push('seq／part = ' + got);
+  if (exp.count !== 7 || exp.app !== 'bonji-mobile' || exp.exportedAt !== 'T') bad.push('信封欄位不對');
+  // 取代：位置不變（分段的順序就是資料）、其他筆不動；刪除：只少那一筆。兩者都不改傳進來的陣列。
+  const rep = L.replaceRecord(items, 1, mk('大悲咒', 'NEW'));
+  if (rep.length !== 7 || rep[1].input !== 'NEW' || rep[0] !== items[0] || rep[2] !== items[2] || items[1].input !== 'ra tna') bad.push('replaceRecord 沒有就地取代');
+  if (!eq(L.replaceRecord(items, 9, mk('x', 'y')), items)) bad.push('replaceRecord 超出範圍時動了清單');
+  const rem = L.removeRecord(items, 1);
+  if (rem.length !== 6 || rem[1] !== items[2] || items.length !== 7) bad.push('removeRecord');
+  return bad.length ? 'FAIL: ' + bad.join('；') : true;
+});
+
+// ㉚ JSON 輸出：悉曇／拉丁／碼位不落地，輸出當下**每一筆用它自己的選項**現算。
+//    期望值寫死在這裡（同一段 `siddha;m`：IAST 是 ṃ、ISO 15919 是 ṁ）——不取自 buildExport 自己的計算。
+//    轉不出來的那一筆 `output: null` ＋ `error`：不整份失敗，也不安靜地少一筆。
+check('㉚ JSON 輸出：每筆用自己的選項現算；轉不出來的那一筆不消失', (w) => {
+  const L = w.Lib;
+  const conv = (input, options) => new w.SiddhamConverter(options).convert(input);
+  const iast = { inputMethod: 'ISO15919', transliteration: 'IAST', ignoreSpacesAndHyphens: true };
+  const iso = { inputMethod: 'ISO15919', transliteration: 'ISO15919', ignoreSpacesAndHyphens: true };
+  const items = [L.makeRecord('t', 'siddha;m', iast, 'A'), L.makeRecord('t', 'siddha;m', iso, 'B')];
+  const bad = [];
+  const [r1, r2] = L.buildExport(items, conv, 'T').records;
+  const lat = (r) => (r && r.output ? r.output.latin : '（無）');
+  if (lat(r1) !== 'siddhaṃ') bad.push('第 1 筆（IAST）latin = ' + lat(r1));
+  if (lat(r2) !== 'siddhaṁ') bad.push('第 2 筆（ISO 15919）latin = ' + lat(r2));
+  if (r1 && r1.output && (r1.output.siddham !== '𑖭𑖰𑖟𑖿𑖠𑖽' || r1.output.ascii !== 'siddha;m' || !/^U\+115AD U\+115B0 /.test(r1.output.codepoints))) bad.push('siddham／ascii／codepoints');
+  if (!r1 || r1.input !== 'siddha;m' || r1.savedAt !== 'A') bad.push('input／savedAt 沒有原樣帶出');
+  const keys = r1 ? Object.keys(r1).join(',') : '';
+  if (keys !== 'seq,part,title,options,input,output,savedAt') bad.push('一筆的欄位變了：' + keys);
+  const exp2 = L.buildExport(items, (i, o) => { if (o.transliteration === 'ISO15919') throw new Error('boom'); return conv(i, o); }, 'T');
+  if (exp2.count !== 2 || exp2.records.length !== 2 || !exp2.records[0].output || exp2.records[1].output !== null || exp2.records[1].error !== 'boom') bad.push('轉不出來的那一筆沒有留下 output:null ＋ error');
+  // 控制器餵給 buildExport 的那支：每一筆各自一個轉換器（不是畫面上那一個——它帶的是「現在」的選項）
+  if (!/function convertWith\(input, options\) \{\s*return new SiddhamConverter\(options\)\.convert\(input\);/.test(w.js)) bad.push('控制器的 convertWith 沒有用那一筆自己的選項');
+  return bad.length ? 'FAIL: ' + bad.join('；') : true;
+});
+
+// ㉛ 從 localStorage 讀回來的紀錄清單不可信：不是陣列當成空的、壞掉的那幾筆丟掉、選項走白名單、多出來的鍵不留
+check('㉛ normalizeStore', (w) => {
+  const L = w.Lib, d = L.DEFAULT_OPTIONS;
+  const kh = { inputMethod: 'KH', transliteration: 'ISO15919', ignoreSpacesAndHyphens: false };
+  const s = L.normalizeStore({ title: '  a  b ', items: [
+    { title: 5, input: 'o;m', options: { inputMethod: 'x' }, savedAt: 7 }, { title: 't', input: '  ' }, 'junk', null,
+    { title: 't', input: 'hrii.h', options: kh, savedAt: 'S', extra: 1 }] });
+  const ok = s.title === 'a b' && s.items.length === 2 &&
+    eq(s.items[0], { title: '', input: 'o;m', options: d, savedAt: '' }) &&
+    eq(s.items[1], { title: 't', input: 'hrii.h', options: kh, savedAt: 'S' }) &&
+    eq(L.normalizeStore(null), { title: '', items: [] }) && eq(L.normalizeStore({ items: 'x' }), { title: '', items: [] });
+  return ok || 'FAIL';
+});
+
+// ㉜ 紀錄功能在手機上的四個坑：
+//    (a) 悉曇欄底下的加入鈕擋 mousedown——打一段、加一筆、接著打，鍵盤不該收（同 ⑪）；它要在悉曇欄的 .out-foot 裡（鍵盤開著時頁首按不到）
+//    (b) 標題欄字級走 --ctl-font（同 ⑩）；(c) 不用 confirm／alert／prompt——Artifacts 的 iframe 裡直接回 false，「先問再做」會變成永遠不做
+//    (d) 面板內 標題 → 清單 → JSON：iOS 鍵盤彈出時 bottom-sheet 的下半截被蓋住，上緣不會；底列固定（modal-fixed-footer）
+//    (e) 標題欄有焦點時鍵盤也開著，那時的高度不可以當成「沒有鍵盤」的基準
+check('㉜ 紀錄面板在手機上：加入不收鍵盤／不放大／不用 confirm／標題欄在最上面', (w) => {
+  const miss = [];
+  if (!/quick\.addEventListener\('mousedown',[^\n]*preventDefault\(\)/.test(w.js)) miss.push('加入鈕沒擋 mousedown');
+  const sblk = (w.html.match(/<div class="out-block out-block-siddham">[\s\S]*?\n      <\/div>/) || [''])[0];
+  const f = sblk.indexOf('class="out-foot"'), q = sblk.indexOf('id="rec-add-quick"');
+  if (!(f >= 0 && f < q)) miss.push('加入鈕不在悉曇欄的 .out-foot 裡');
+  if (!/input\[type="text"\]\.rec-title\s*\{[^}]*font-size:\s*var\(--ctl-font\)/.test(w.css)) miss.push('標題欄沒用 --ctl-font');
+  const code = w.js.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+  if (/(^|[^.\w$])(confirm|alert|prompt)\s*\(|window\.(confirm|alert|prompt)\s*\(/m.test(code)) miss.push('用了 confirm／alert／prompt');
+  const sheet = (w.html.match(/<div id="records-modal"[\s\S]*?\n  <\/div>\n/) || [''])[0];
+  const t = sheet.indexOf('id="rec-title"'), l = sheet.indexOf('id="rec-list"'), j = sheet.indexOf('id="rec-json"');
+  if (!(t > 0 && t < l && l < j)) miss.push('面板內的順序不是 標題 → 清單 → JSON');
+  if (!/modal-fixed-footer/.test((sheet.match(/<div id="records-modal"[^>]*>/) || [''])[0])) miss.push('不是 modal-fixed-footer');
+  if (!/if \(!focused && document\.activeElement !== \$recTitle\) state\.baseline = box\.height;/.test(w.js)) miss.push('標題欄有焦點時仍更新鍵盤基準');
+  return miss.length ? 'FAIL: ' + miss.join('、') : true;
+});
+
+// ㉝ 清單存在 localStorage——那是方便不是備份，而且可能存不住（iOS 上的 Artifacts 版寫得進讀不回）：
+//    每次存完讀回來比對，對不上就在面板上講出來。下載檔名照家族慣例 yyyyMMddHHmmss、圖示照 §5.6（file_download）。
+check('㉝ 清單存不住要講出來；下載檔名與圖示', (w) => {
+  const miss = [];
+  if (!/localStorage\.setItem\(REC_KEY, text\); ok = localStorage\.getItem\(REC_KEY\) === text;/.test(w.js)) miss.push('存完沒有讀回來比對');
+  if (!/getElementById\('rec-storage-note'\)\.hidden = ok;/.test(w.js)) miss.push('存不住時面板上不講');
+  if (!/id="rec-storage-note"[^>]*data-i18n="rec\.storageFail"/.test(w.html)) miss.push('面板上沒有那一行');
+  const name = w.Lib.exportFilename(new Date(2026, 9, 11, 9, 5, 7));
+  if (name !== 'bonji-mobile-20261011090507.json') miss.push('檔名 ' + name);
+  if (!/id="rec-download"[^>]*>\s*<i class="material-icons left">file_download<\/i>/.test(w.html)) miss.push('下載鈕的圖不是 file_download');
+  return miss.length ? 'FAIL: ' + miss.join('、') : true;
+});
+
 /* ---------- 工具 ---------- */
 function eq(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
 function walk(dir) {
@@ -477,7 +584,24 @@ const MUTANTS = [
   ['㉗', '母音的 焐 也被收進記號列（白名單失效）', (w) => { w.Lib.CATALOG_CBETA_SETS.vowel = true; const v = w.catalog.categories.find((c) => c.id === 'vowel').entries.find((e) => e.group === 'uniSiddham'); const l = w.catalog.categories.find((c) => c.id === 'ligature'); l.entries.push(Object.assign({}, v)); }],
   ['㉘', 'Noto 字號改回 1.05rem', (w) => { w.css = w.css.replace(/(^\.key-glyph\s*\{[^}]*?font-size:\s*)19px/m, '$11.05rem'); }],
   ['㉘', 'CBETA 完整字母改回 22px', (w) => { w.css = w.css.replace('.key-cbeta-whole .key-svg { height: 19px; }', '.key-cbeta-whole .key-svg { height: 22px; }'); }],
-  ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }]
+  ['⑲', '控制器直接 import 引擎', (w) => { w.js = 'import { ascii2siddham } from "./vendor/bonji-input/siddham.js";\n' + w.js; }],
+  ['㉙', '標題被當成鍵（同名的覆寫前一筆）', (w) => { w.Lib.addRecord = (items, rec) => { const i = items.findIndex((x) => x.title === rec.title); return i >= 0 ? items.map((x, k) => (k === i ? rec : x)) : items.concat([rec]); }; }],
+  ['㉙', '空標題不給加', (w) => { const f = w.Lib.makeRecord; w.Lib.makeRecord = (t, i, o, s) => (String(t || '').trim() ? f(t, i, o, s) : null); }],
+  ['㉙', 'part 不分標題（等於 seq）', (w) => { const f = w.Lib.buildExport; w.Lib.buildExport = (...a) => { const e = f(...a); e.records.forEach((r) => { r.part = r.seq; }); return e; }; }],
+  ['㉙', '取代把那一筆搬到最後', (w) => { w.Lib.replaceRecord = (items, i, rec) => items.filter((_, k) => k !== i).concat([rec]); }],
+  ['㉚', '每一筆都用第一筆的選項', (w) => { const f = w.Lib.buildExport; w.Lib.buildExport = (items, c, t) => f(items, (i) => c(i, items[0].options), t); }],
+  ['㉚', '轉不出來的那一筆被安靜地丟掉', (w) => { const f = w.Lib.buildExport; w.Lib.buildExport = (...a) => { const e = f(...a); e.records = e.records.filter((r) => r.output); e.count = e.records.length; return e; }; }],
+  ['㉚', '控制器共用畫面上那個轉換器', (w) => { w.js = w.js.replace('return new SiddhamConverter(options).convert(input);', 'return converter.convert(input);'); }],
+  ['㉛', '讀回的清單不驗證', (w) => { w.Lib.normalizeStore = (s) => s || { title: '', items: [] }; }],
+  ['㉜', '加入鈕不擋 mousedown', (w) => { w.js = w.js.replace("quick.addEventListener('mousedown'", "quick.addEventListener('pointerup'"); }],
+  ['㉜', '加入鈕搬到頁首', (w) => { const m = w.html.match(/          <a href="#!" id="rec-add-quick"[\s\S]*?<\/a>\n/); w.html = w.html.replace(m[0], '').replace('<a href="#!" id="open-options"', m[0] + '<a href="#!" id="open-options"'); }],
+  ['㉜', '標題欄字級寫死 16px', (w) => { w.css = w.css.replace(/(input\[type="text"\]\.rec-title\s*\{[^}]*font-size:\s*)var\(--ctl-font\)/, '$116px'); }],
+  ['㉜', '刪除改用 confirm()', (w) => { w.js = w.js.replace("if (!isArmed(act, i)) { arm(act, i, 'rec.toast.confirmRemove', { n: n }); return; }", "if (!confirm('delete?')) return;"); }],
+  ['㉜', 'JSON 排到標題欄上面', (w) => { w.html = w.html.replace('id="rec-title"', 'id="__t__"').replace('id="rec-json"', 'id="rec-title"').replace('id="__t__"', 'id="rec-json"'); }],
+  ['㉜', '標題欄有焦點時也更新鍵盤基準', (w) => { w.js = w.js.replace(' && document.activeElement !== $recTitle) state.baseline', ') state.baseline'); }],
+  ['㉝', '存完不讀回比對', (w) => { w.js = w.js.replace('ok = localStorage.getItem(REC_KEY) === text;', 'ok = true;'); }],
+  ['㉝', '下載檔名不補零', (w) => { w.Lib.exportFilename = (d) => 'bonji-mobile-' + d.getFullYear() + (d.getMonth() + 1) + d.getDate() + d.getHours() + d.getMinutes() + d.getSeconds() + '.json'; }],
+  ['⑭', '紀錄的 toast 用了未定義的 key', (w) => { w.js = w.js.replace("recToast('rec.toast.replaced'", "recToast('rec.toast.replacedX'"); }]
 ];
 
 async function selftest() {

@@ -14,6 +14,7 @@ Part of the **nodeapp WebApp family**: <https://github.com/scottgfhong310/nodeap
 - **Follows the keyboard**: the screen shrinks to the top of the on-screen keyboard (`visualViewport` on iOS, `interactive-widget=resizes-content` on Android); the header folds away to give the output more room.
 - **Key row (vowel → variant → bindu → upper → lower → ligature)**: a button right of the input cycles through six groups (upper/lower ligature keys draw CBETA glyphs, see *CBETA glyphs* below): **vowel** (`a` `aa` `i` … `a;m`), **variant** (`__i` 𑗘 `_i` 𑗙 `_ii` 𑗚 `__u` 𑗛), **bindu** (`aa` `i` `;m` `.h` `~m` …) and **ligature** (`k` `kh` `.t` `;s` …) keys, each with its Siddhaṁ glyph; tapping a key keeps the keyboard open. Groups and glyphs come from bonji's `BonjiInput.xlsx`.
 - **Options** (`tune`, top right): input method (ISO 15919 / Kyoto-Harvard), transliteration (ISO 15919 / IAST), ignore spaces & hyphens.
+- **Records · JSON output** (`{}`, top right): save the current input as a record with a **title**, then output the whole list as JSON (copy or download). **Titles may be empty and may repeat** — record one mantra in several parts under the same title, and `part` in the output tells them apart. While typing, the add button under the Siddhaṁ column saves a record without closing the keyboard. The list lives only in your browser; it is not a backup.
 - Copy buttons on both outputs; example chips; input and options are kept as a draft in your browser only.
 - Bundled **Noto Sans Siddham** (SIL OFL); three UI languages (`zh-Hant` / `en` / `ja`); light / dark themes.
 - **No backend**: the server only serves static files. A [Claude Artifacts build](https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG) (private) also exists.
@@ -27,6 +28,35 @@ npm install
 npm start                 # → http://localhost:3000/apps/bonji-mobile/
 npm run verify            # contract checks
 ```
+
+## JSON output
+
+```jsonc
+{
+  "app": "bonji-mobile",
+  "exportedAt": "2026-10-11T01:30:09.171Z",   // the moment you copy / download
+  "count": 2,
+  "records": [
+    {
+      "seq": 1,                // position in the whole list
+      "part": 1,               // position among records with the same title
+      "title": "大悲咒",        // may be empty, may repeat
+      "options": { "inputMethod": "ISO15919", "transliteration": "IAST", "ignoreSpacesAndHyphens": true },
+      "input": "na mo ra tna tra yaa ya",      // verbatim, exactly as typed
+      "output": {              // computed at export time; null plus an "error" key if conversion throws
+        "siddham": "𑖡𑖦𑖺𑖨𑖝𑖿𑖡𑖝𑖿𑖨𑖧𑖯𑖧",
+        "latin": "na mo ra tna tra yā ya",
+        "ascii": "na mo ra tna tra yaa ya",    // normalised ASCII notation
+        "codepoints": "U+115A1 U+115A6 …"
+      },
+      "savedAt": "2026-10-11T01:00:00.000Z"    // when this record was saved (or last replaced)
+    },
+    { "seq": 2, "part": 2, "title": "大悲咒", "…": "…" }
+  ]
+}
+```
+
+Unlike bonji's export file: one file is **the whole list**, not a single record; `input` is verbatim and the normalised form is in `output.ascii`; there is no `sourceFile` / `composition`.
 
 ## CBETA glyphs
 

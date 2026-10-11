@@ -11,10 +11,10 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 28 條契約檢查
-node scripts/verify.js --selftest        # 38 個反向注入，全部必須被抓到
+npm run verify                           # 33 條契約檢查
+node scripts/verify.js --selftest        # 55 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
-python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）
+python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時宣告 capabilities {downloads: true}
 ```
 
 ## 結構
@@ -25,7 +25,7 @@ scripts/verify.js                        # 契約檢查 ＋ --selftest
 artifact/{build.py, vendor/materialize.min.css}   # Artifacts 版建置（差異全在 PATCHES）
 public/apps/bonji-mobile/
 ├─ index.html · bonji-mobile.css · bonji-mobile.js   # 結構 / 樣式 / 控制器（ESM）
-├─ bonji-mobile-lib.js                   # 純核心（IIFE → window.BonjiMobileLib，不碰 DOM）
+├─ bonji-mobile-lib.js                   # 純核心（IIFE → window.BonjiMobileLib，不碰 DOM）：記號列／可見範圍／草稿／**紀錄清單與 JSON 輸出**
 ├─ siddham-converter.js                  # ⚠️ bonji 的複製件（防腐層）
 ├─ vendor/bonji-input/                   # ⚠️ bonji 的複製件（MIT 引擎，勿改）
 ├─ fonts/{NotoSansSiddham-Regular.woff2, OFL.txt}   # 唯一的字型（OFL）
@@ -48,6 +48,10 @@ public/apps/bonji-mobile/
 8. **Claude App 裡鍵盤彈出時 iframe 不縮、整頁被往上推**：輸出區上緣會被 App 標題列蓋住 ⇒ 悉曇｜拉丁**左右並排 2:1、文字靠底**、**標籤與複製鈕在欄位底部**；底部安全區以**焦點**判斷、不靠高度（第 ㉒ 條，DESIGN §3.2）。
 9. **`cbeta/` 絕不可以進 GitHub**（CBETA 字形外框，字型沒有再散布授權；owner 2026-10-09 只准隨 Artifacts 版）——第 ㉕ 條盯著；`git add -A` 也擋得住，但不要用 `-f`。
 10. **不要加 `local()` 字型**：手機上沒有 Mojikyo／Siddam，會畫成一般漢字而看起來正常（DESIGN §5，第 ⑯ 條）。
+11. **紀錄清單的標題不是鍵**〔owner 2026-10-11〕：可以重複、可以留空（一部咒語分好幾段記）——**不要加查重、覆寫或合併**；同名各段靠順序分開（輸出的 `part`）。第 ㉙ 條。
+12. **紀錄清單只存 input 與選項，輸出現算**（每一筆用它自己的選項，第 ㉚ 條）；清單在 `localStorage`——**方便，不是備份**，存完讀回比對、存不住要在畫面上講（第 ㉝ 條）。
+13. **不要用 `confirm()`／`alert()`**：Artifacts 的 iframe 裡直接回 false。會毀掉東西的動作一律「再按一次」（`arm()`，第 ㉜ 條）。
+14. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
 
 ## 複製件登記
 
@@ -61,4 +65,4 @@ public/apps/bonji-mobile/
 
 ## Claude Artifacts 版
 
-<https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG>（private）。**改了前端要更新**：重跑 `build.py`，再以 Artifact 工具帶 `url` 重新發佈 `artifact/dist/` 整包（先 `read` 一次）。
+<https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG>（private）。**改了前端要更新**：重跑 `build.py`，再以 Artifact 工具帶 `url` 重新發佈 `artifact/dist/` 整包（先 `read` 一次），**宣告 `capabilities: {downloads: true}`**（紀錄清單的 JSON 下載；沙盒會擋掉 `<a download>`）。

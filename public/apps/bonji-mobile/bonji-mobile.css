@@ -148,6 +148,26 @@ body.kb-open .topbar { display: none; }
 .topbar-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .topbar-btn.active { color: var(--accent); }
 
+/* 紀錄鈕上的筆數（0 筆時 hidden） */
+.topbar-btn { position: relative; }
+.topbar-btn .rec-badge {
+  position: absolute;
+  top: 4px;
+  right: 1px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+  pointer-events: none;
+}
+
 /* ===== 輸出區 ===== */
 /* 悉曇與拉丁轉寫**左右並排、寬 2:1**〔owner 2026-10-08〕：Claude App 裡鍵盤彈出時頁面被往上推，
  * 輸出區的上半截會落到 App 標題列底下——上下排的話悉曇整塊看不見（截圖實況），並排則兩欄都露出下半截。 */
@@ -236,6 +256,9 @@ body.kb-open .topbar { display: none; }
 }
 .out-copy:hover { color: var(--accent); background: var(--surface-2); }
 .out-copy i { font-size: 18px; }
+/* 加入紀錄清單（悉曇欄底部，複製鈕左邊）：auto margin 把兩顆鈕一起推到右邊、標籤留在左邊 */
+.out-add { margin-left: auto; }
+.out-add i { font-size: 20px; }
 
 /* 空狀態：輸入是空的時候取代兩塊輸出 */
 .empty-state { display: none; padding: 8px 4px; }
@@ -464,6 +487,210 @@ code {
 .opt-switch { margin: 6px 0 18px; }
 .options-sheet .credit { font-size: .8rem; color: var(--muted); margin: 0; }
 
+/* ===== 紀錄・JSON 輸出（bottom-sheet ＋ modal-fixed-footer） =====
+ * 面板拉高到 88%（Materialize 的 bottom-sheet 上限是 45%、fixed-footer 是 70%）：清單與 JSON 都要有地方放；
+ * 上面留 12% 是 Claude App 的標題列。0,3,0 贏過 Materialize 那兩條（0,2,0）。
+ * ⚠️ 捲動的是 .modal-content（fixed-footer 的形制），底列固定——「完成」與兩顆輸出鈕不必捲到底才按得到。 */
+.modal.bottom-sheet.records-sheet {
+  height: 88%;
+  max-height: 88%;
+}
+.records-sheet.modal-fixed-footer .modal-content {
+  height: calc(100% - 56px - env(safe-area-inset-bottom, 0px));
+  padding: 16px 16px 12px;
+  box-sizing: border-box;
+  -webkit-overflow-scrolling: touch;
+}
+.records-sheet.modal-fixed-footer .modal-footer {
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  white-space: nowrap;
+}
+.records-sheet .modal-footer .btn-flat { padding: 0 10px; }
+.records-sheet .modal-footer .btn-flat i.left { margin-right: 6px; }
+.records-sheet .sheet-title {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 0 0 12px;
+}
+
+/* 標題欄：Materialize 原生底線式輸入。⚠️ 字級走 --ctl-font（≥16px，否則 iOS 聚焦時放大整頁；第 ⑩ 條）。
+ * 0,3,1 贏過 Materialize 的 input[type=text]:not(.browser-default)（0,2,1）。 */
+.records-sheet input[type="text"].rec-title {
+  font-size: var(--ctl-font);
+  margin: 0;
+}
+
+/* 「目前的輸入」＋ 加入鈕 */
+.rec-current {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 0 8px;
+}
+.rec-current-body { flex: 1 1 auto; min-width: 0; }
+.rec-current-text {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rec-current-text.siddham-text { font-size: 1.4rem; line-height: 1.7; padding-bottom: 0; }
+.rec-current-text.is-empty { color: var(--muted); font-size: .9rem; line-height: 2.4; }
+.rec-current .rec-add {
+  flex: none;
+  padding: 0 10px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.rec-current .rec-add.disabled { color: var(--muted); border-color: var(--border); }
+.rec-current .rec-add i.left { margin-right: 6px; }
+
+.rec-note {
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+.rec-note.rec-warn { color: var(--danger); }
+
+.rec-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  margin: 12px 0 0;
+  border-bottom: 1px solid var(--border);
+}
+.rec-heading h3 {
+  margin: 0;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rec-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rec-list .rec-empty {
+  color: var(--muted);
+  font-size: .9rem;
+  line-height: 1.7;
+  padding: 10px 0;
+}
+.rec-item {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--border);
+}
+/* 一筆：點它＝載回輸入框。三行——（序號・標題・第幾段）／悉曇／輸入的記法 */
+.rec-list .rec-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;                     /* 悉曇的上方符號會頂到標題那一行 */
+  padding: 8px 4px 8px 0;
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+.rec-list .rec-main.armed { background: var(--surface-2); }
+.rec-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.rec-head .rec-seq {
+  flex: none;
+  min-width: 1.4em;
+  color: var(--muted);
+  font-family: var(--mono-font);
+  font-size: .85rem;
+  text-align: right;
+}
+.rec-head .rec-name {
+  min-width: 0;
+  color: var(--text);
+  font-size: .95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rec-head .rec-name.is-empty { color: var(--muted); font-weight: 400; }
+/* 「第 n 段」：同一個標題有好幾筆時才出現——標題重複時靠它分得開 */
+.rec-head .rec-part {
+  flex: none;
+  color: var(--accent);
+  font-size: .75rem;
+  line-height: 1.5;
+  padding: 0 7px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+}
+.rec-main .rec-sid {
+  color: var(--text);
+  font-family: var(--siddham-font);
+  font-size: 1.3rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.rec-main .rec-err { color: var(--danger); font-size: .85rem; }
+.rec-main .rec-in {
+  color: var(--muted);
+  font-size: .8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 列上的動作鈕（取代／刪除）與「全部清除」：44px 觸控目標。上膛（再按一次才執行）時反白 */
+.records-sheet .rec-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: var(--muted);
+  border-radius: 8px;
+  -webkit-tap-highlight-color: transparent;
+}
+.records-sheet .rec-btn[hidden] { display: none; }
+.records-sheet .rec-btn:hover { color: var(--accent); background: var(--surface-2); }
+.records-sheet .rec-btn.rec-danger:hover { color: var(--danger); }
+.records-sheet .rec-btn.armed,
+.records-sheet .rec-btn.armed:hover { color: var(--bg); background: var(--accent); }
+.records-sheet .rec-btn.rec-danger.armed,
+.records-sheet .rec-btn.rec-danger.armed:hover { color: var(--bg); background: var(--danger); }
+
+.rec-json {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: .8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.rec-json.is-empty { color: var(--muted); font-family: inherit; }
+
 /* ===== toast 一律在上方 =====
  * Materialize 在窄螢幕把 toast 放底部；iOS 上那是 layout viewport 的底部，**正好在鍵盤後面**，
  * 而且會蓋住輸入列。改貼外殼上緣（--shell-top 由 fitShell 寫入）。
@@ -475,6 +702,9 @@ code {
   right: auto;
   transform: translateX(-50%);
   min-width: 0;
+  /* ⚠️ left:50% 讓 shrink-to-fit 的可用寬度只剩半個螢幕（375px 時 187px）⇒ 稍長的句子折成三四行、蓋掉半個頁首。
+   *    明講寬度跟著內容走，上限仍是 92%。 */
+  width: max-content;
   max-width: 92%;
 }
 

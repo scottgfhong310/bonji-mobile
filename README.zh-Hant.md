@@ -14,11 +14,12 @@
 - **跟著鍵盤**：鍵盤彈出時畫面縮到鍵盤上緣（iOS 以 `visualViewport`、Android 以 `interactive-widget=resizes-content`），頁首自動收起把高度讓給輸出。
 - **記號列（母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續）**：輸入框右側一顆鈕依序切換六組（上／下接續的鍵畫 CBETA 字形，見下方〈CBETA 字形〉）——**母音**（`a` `aa` `i` … `a;m`）、**異體字**（`__i` 𑗘 `_i` 𑗙 `_ii` 𑗚 `__u` 𑗛）、**體文**（`aa` `i` `;m` `.h` `~m` …）與**接續**（`k` `kh` `.t` `;s` …），一鍵插入、附悉曇字形；按鍵不會讓鍵盤收起。分類與字形來自 bonji 的 `BonjiInput.xlsx`。
 - **選項**（右上角 `tune`）：輸入法（ISO 15919 / Kyoto-Harvard）、拉丁轉寫（ISO 15919 / IAST）、忽略空格與連字號。
+- **紀錄清單・JSON 輸出**（右上角 `{}`）：把目前的輸入加上**標題**記成一筆，再把整份清單輸出成 JSON（複製或下載）。**標題可以留空、可以重複**——一部咒語分好幾段記，每一段用同一個標題，輸出的 `part` 就是第幾段。打字時按悉曇欄底部的加入鈕就能記一筆，鍵盤不會收起來。清單只存在你的瀏覽器裡，不是備份。
 - 輸出各有複製鈕；範例 chips；輸入與選項自動存成草稿（只存在你的瀏覽器）。
 - 內嵌 **Noto Sans Siddham**（SIL OFL）；三語介面（`zh-Hant` / `en` / `ja`）；light / dark 主題。
 - **零後端**：伺服器只送靜態檔。另有 [Claude Artifacts 版](https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG)（private）。
 
-與 bonji 不同的地方（不帶輔助輸入的 Cbeta／Mojikyo 兩群、Composition、ASCII／HTML／碼位輸出、匯出與對照表）與理由見 [`DESIGN.md`](./DESIGN.md) §5。
+與 bonji 不同的地方（不帶輔助輸入的 Cbeta／Mojikyo 兩群、Composition、ASCII／HTML／碼位輸出、存到伺服器的匯出檔與對照表）與理由見 [`DESIGN.md`](./DESIGN.md) §5。
 
 ## 執行
 
@@ -37,6 +38,35 @@ npm run verify            # 契約檢查
 | `huu~m` | 𑖮𑖳𑖼 | hūm̐ |
 
 完整對照見 bonji 的字元對照表。
+
+## JSON 輸出的結構
+
+```jsonc
+{
+  "app": "bonji-mobile",
+  "exportedAt": "2026-10-11T01:30:09.171Z",   // 按下複製／下載的那一刻
+  "count": 2,
+  "records": [
+    {
+      "seq": 1,                // 在整份清單裡第幾筆
+      "part": 1,               // 同一個標題裡第幾段（標題重複時靠它分段）
+      "title": "大悲咒",        // 可以是空字串、可以重複
+      "options": { "inputMethod": "ISO15919", "transliteration": "IAST", "ignoreSpacesAndHyphens": true },
+      "input": "na mo ra tna tra yaa ya",      // 原樣（打了什麼就是什麼）
+      "output": {              // 輸出當下現算；轉不出來時是 null，並多一個 "error"
+        "siddham": "𑖡𑖦𑖺𑖨𑖝𑖿𑖡𑖝𑖿𑖨𑖧𑖯𑖧",
+        "latin": "na mo ra tna tra yā ya",
+        "ascii": "na mo ra tna tra yaa ya",    // 正規化後的 ASCII 記法
+        "codepoints": "U+115A1 U+115A6 …"
+      },
+      "savedAt": "2026-10-11T01:00:00.000Z"    // 這一筆記下（或被取代）的時間
+    },
+    { "seq": 2, "part": 2, "title": "大悲咒", "…": "…" }
+  ]
+}
+```
+
+與 bonji 的匯出檔不同的地方：一份是**一整份清單**（不是一筆）；`input` 是原樣、正規化版另存在 `output.ascii`；沒有 `sourceFile`／`composition`。
 
 ## CBETA 字形
 

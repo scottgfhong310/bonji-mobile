@@ -1,6 +1,6 @@
 # bonji-mobile — 設計決議
 
-> 版本 v1.2｜2026-10-08
+> 版本 v1.3｜2026-10-11
 
 「怎麼用」在 README，「為什麼長這樣」在這裡。家族共同規範（結構／i18n／主題／側鍵）只標引用、不重複：
 [DESIGN_GUIDELINES](https://github.com/scottgfhong310/nodeapp-webapp-family/blob/main/DESIGN_GUIDELINES.md)。
@@ -121,7 +121,7 @@ owner 在 iPhone 的 Claude App 裡打字的截圖顯示兩件事，**成因是�
 |---|---|
 | 輔助輸入的 Cbeta／Mojikyo 兩群、Composition | 手機上沒有安裝那兩支字型，`local()` 一定落空，字格會畫成一般漢字——看起來正常卻是錯的字。⚠️ **例外（2026-10-09）**：Cbeta 群的上接續／下接續改以 **SVG** 畫在記號列上（§6.1），不經 `local()` |
 | ASCII 記法／HTML 片段／Unicode 碼位三種輸出 | 第一屏放不下五塊；手機上的用途是「打了看結果」 |
-| 標題、JSON 匯出／清單／載回 | 需要後端；本 app 零後端 |
+| 存到伺服器的匯出檔（`/api/bonji/export`）與匯出檔清單 | 需要後端；本 app 零後端。⚠️ **2026-10-11 起有自己的版本**：標題＋紀錄清單＋JSON 輸出，全在瀏覽器裡，見 §10 |
 | 兩張對照表 | 記號列＋說明取代 |
 
 ⇒ **字型只有 Noto Sans Siddham**（SIL OFL），CSS 裡**一個 `local()` 都沒有**（第 ⑯ 條）。CBETA 上／下接續的字形是**SVG 外框**、不是字型檔，見 §6.1——那一份**不進 GitHub**。
@@ -210,7 +210,66 @@ WebKit bug 200627）。⚠️ 來源是 2016–2022 年的，未在現行 iOS �
 ## 9. Artifacts 版
 
 <https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG>（private）。由 `python3 artifact/build.py` 組出，形制照 bonji：**不存複製件**，差異只有一處補丁
-——`materialize.min.css` 自己託管（CSP 擋 cdnjs 樣式表且不報錯）。零後端 ⇒ 不需要任何 capability。
+——`materialize.min.css` 自己託管（CSP 擋 cdnjs 樣式表且不報錯）。
+**2026-10-11 起是兩處**：紀錄清單的 JSON 下載改走 `downloads` capability（沙盒擋掉 `<a download>`，blob: 也一樣，而且不報錯）
+⇒ **發佈時要宣告 `capabilities: {downloads: true}`**。補丁的錨點是 `downloadText()` 的函式本體，兩邊契約相同（`Promise<boolean>`）。
 
 ⚠️ **已知未驗**：Artifacts 版跑在宿主頁的 iframe 裡。鍵盤彈出時 iframe 自己的 `visualViewport` 會不會跟著縮，**取決於宿主怎麼排版那個 iframe**，
 不是本 app 控制得了的。若手機上實測輸入被鍵盤蓋住，原因多半在這一層，要另想辦法（不是改 `fitShell` 的算式）。
+
+## 10. 紀錄清單與 JSON 輸出〔owner 2026-10-11〕
+
+owner 的需求：「增加一個 json output 的介面，也可以記錄 title 後再輸出 json；**title 可以允許重複**，這樣可以整理悉曇咒語不同的分段。」
+
+```
+頁首 {}（筆數） ──→ 紀錄面板（bottom-sheet，88% 高，底列固定）
+                     標題欄 ｜ 目前的輸入 ＋ [加入清單]
+                     清單：序號・標題・第 n 段／悉曇／記法   [取代][刪除]　← 點一筆＝載回輸入框
+                     JSON（整份清單）
+                     底列：[複製 JSON] [下載] [完成]
+悉曇欄底部 [＋] ──→ 直接加入一筆（鍵盤不收）
+```
+
+- **一筆紀錄＝標題＋當時的輸入＋當時的三個選項**，清單依加入的順序排。**標題不是鍵**：可以重複、可以留空——
+  一部咒語分好幾段記，每一段掛同一個標題。加入時**不查重、不覆寫、不合併**（第 ㉙ 條）。
+  同名各段靠順序分開：輸出的 `seq` 是整份清單第幾筆、**`part` 是同一個標題裡第幾段**；清單上同名超過一筆時才標「第 n 段」。
+- **輸出不落地**：清單只存 `input` 與 `options`，悉曇／拉丁／碼位在列清單與輸出 JSON 的當下由轉換器現算，**每一筆用它自己的選項**（第 ㉚ 條）。
+  存一份的話，轉換核心（bonji 的複製件）改版後清單裡會留著舊結果，而畫面上看不出來。
+  轉不出來的那一筆 `output: null` ＋ `error`——不整份失敗，也不安靜地少一筆。
+- **JSON 的形狀**見 README。與 bonji 的匯出檔刻意不同的三處：①一份是**整份清單**；②`input` 是**原樣**（載回輸入框時逐字相同），
+  bonji 存的是正規化後的 ASCII——本 app 另存在 `output.ascii`；③沒有 `sourceFile`／`composition`（本 app 沒有那兩個概念）。
+  每一筆的 `title`／`options`／`input`／`output.{siddham,latin,codepoints}` 與 bonji 同名同義。
+- **畫面上那一份＝複製／下載的那一份**：`refreshJson()` 每次現算並寫進 `<pre>`，複製與下載拿的就是它回傳的那個字串（實測下載內容與畫面逐字相同）。
+- **加入鈕在悉曇欄底部**（`#rec-add-quick`，複製鈕左邊）：鍵盤開著時頁首按不到（Safari 收起、Claude App 被推到標題列底下，§3.2），
+  而分段記是「打一段、加一筆」連著做——每一筆都要先收鍵盤、開面板的話是五個動作。它擋 `mousedown`（同記號列），標題用面板裡那一欄現在的值。
+  **加入後不自動清空輸入**：清空是看得見的一顆鈕，自動清掉會讓剛打的字從畫面上消失。
+- **標題欄在面板最上面**：iOS 鍵盤彈出時不縮 layout viewport，bottom-sheet 的下半截會被鍵盤蓋住，上緣不會。字級走 `--ctl-font`（§7）。
+  ⚠️ 標題欄有焦點時鍵盤也開著——`fitShell()` 那時量到的高度不可以當成「沒有鍵盤」的基準（第 ㉜ 條）。
+- **面板用 `modal-fixed-footer`**：捲動的是 `.modal-content`，底列的三顆鈕不必捲到底才按得到。開啟後把 `scrollTop` 歸零（它會留在上次的位置；歸零要在 `open()` 之後）。
+- **「再按一次」取代 `confirm()`**：Artifacts 的 iframe 裡 `confirm()` 不跳對話框、直接回 false。取代／刪除／全部清除，以及**載回時輸入框裡有還沒記下的內容**，
+  第一次按只上膛（鈕變成打勾、toast 講清楚再按一次會發生什麼），4 秒內再按同一顆才執行；按別顆不會執行前一顆（實測）。
+- **取代是就地取代**（位置不變）：分段的順序就是資料。`savedAt` 改成取代的那一刻。
+- ⚠️ **清單存在 `localStorage`——那是這支瀏覽器的方便，不是備份**（面板底下恆有一行字講這件事）。
+  iOS 上的 Artifacts 版可能「寫得進讀不回」（家族 memory `artifact-runtime-gotchas` 第 5 條）⇒ 開機時探一次、每次存完讀回來比對，
+  對不上就在面板上亮出紅字、並在第一次發生時跳一則 toast（面板沒開時看不到那行字）。**探針只證明這一刻存得住，證明不了撐得過關掉頁面。**
+  ⇒ 要留存的東西一律輸出 JSON。讀回來的清單經 `normalizeStore()` 白名單，壞掉的那幾筆丟掉、其餘留著（第 ㉛ 條）。
+- **下載**：一般瀏覽器走 Blob ＋ `<a download>`，檔名 `bonji-mobile-yyyyMMddHHmmss.json`；Artifacts 版走 `downloads` capability（§9）。
+  複製的退路（`execCommand`）那個暫用的 textarea 要掛在 modal 裡——Materialize 的 modal 會把跑到外面的焦點搶回去（http 的區網位址沒有 `navigator.clipboard`，走的就是這條）。
+- **toast 的寬度**順手修了：`left:50%` 讓 shrink-to-fit 的可用寬度只剩半個螢幕，稍長的句子折成三四行；改成 `width: max-content`（上限仍是 92%）。
+
+### 10.1 證據分級
+
+| 驗了什麼 | 怎麼驗的 |
+|---|---|
+| 加入／取代／刪除／載回／全部清除、上膛逾時、同名分段、讀回髒資料 | preview 375×812 實跑；lib 的部分另有第 ㉙～㉛ 條與 `--selftest` |
+| 加入鈕不收鍵盤 | preview 真點擊後 `document.activeElement` 仍是輸入框（**不是真機**） |
+| 複製的退路在 modal 裡選得住 | 拿掉 `navigator.clipboard` 後攔 `execCommand`：焦點在 modal 內的 textarea、內容與畫面相同 |
+| 下載的內容 | 攔下 `<a download>` 讀回 blob：與畫面上的 JSON 逐字相同 |
+| 存不住時會講 | 讓 `setItem` 丟例外：紅字出現、toast 只跳一次、之後存得住時紅字消失 |
+| **真機**：iOS 上面板裡打標題、Claude App 裡的下載（分享面板）、清單撐不撐得過關掉頁面 | **尚未**——要 owner 實測 |
+
+### 10.2 刻意沒做的
+
+- **匯入**（把 JSON 貼回來還原清單）：owner 沒有要；清單存不住的環境裡這是唯一能接續的路，需要時再加。
+- **調整順序**：取代是就地的，加錯位置時刪掉重加；沒有上下移動。
+- **bonji 讀本 app 的 JSON**：形狀不同（整份清單 vs 一筆），bonji 那邊沒有動。

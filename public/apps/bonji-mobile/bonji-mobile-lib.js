@@ -15,9 +15,17 @@
  *   keyboardOpen(base, h)      → boolean —— 可見高度比基準少到「一定是鍵盤」了沒
  *   normalizeOptions(o)        → 三個選項的白名單版本（從 localStorage 讀回來的不可信）
  *   normalizeDraft(d)          → { input, options } —— 草稿同上
+ *   normalizeTitle(t)          → 標題的單行版本（**可以是空的、可以重複**）
+ *   makeRecord(t, i, o, iso)   → 一筆紀錄 `{ title, input, options, savedAt }`；input 是空的回 null
+ *   normalizeStore(s)          → { title, items } —— 紀錄清單（從 localStorage 讀回來的不可信）
+ *   addRecord／replaceRecord／removeRecord(items, …) → 新陣列（不改輸入）
+ *   buildExport(items, convert, iso) → JSON 輸出的那個物件（輸出是匯出當下**算出來的**，不落地）
+ *   exportFilename(date)       → `bonji-mobile-yyyyMMddHHmmss.json`
  *
  * 資料格式：catalog `{ categories: [{ id, entries: [{ code, char, group }] }] }`（bonji 的 BonjiInput.xlsx 匯出）；
- *           草稿 `{ input: string, options: { inputMethod, transliteration, ignoreSpacesAndHyphens } }`。
+ *           草稿 `{ input: string, options: { inputMethod, transliteration, ignoreSpacesAndHyphens } }`；
+ *           紀錄清單 `{ title: string, items: [{ title, input, options, savedAt }] }`（title＝標題欄現在的值）；
+ *           JSON 輸出 `{ app, exportedAt, count, records: [{ seq, part, title, options, input, output, savedAt }] }`。
  * 後端 API：無（零後端，DATABASE_GUIDELINES §0 的第 0 層）。
  */
 (function (root) {
@@ -160,6 +168,91 @@
     return { input: typeof d.input === 'string' ? d.input : '', options: normalizeOptions(d.options) };
   }
 
+  /* ---------- 紀錄清單與 JSON 輸出 ----------
+   * 一筆紀錄＝「標題＋當時的輸入＋當時的三個選項」；清單依加入的順序排。
+   * ⭐ **標題可以重複、也可以是空的**〔owner 2026-10-11〕：一部咒語分好幾段記，每一段都掛同一個標題
+   *    ⇒ 標題**不是鍵**。加入時不查重、不覆寫、不合併；分得開同名各段的是順序（輸出的 `part`）。
+   * ⭐ **輸出不落地**：清單只存 input 與 options，悉曇／拉丁／碼位在列清單與輸出 JSON 的當下由轉換器算出來
+   *    ——存一份的話，轉換核心（bonji 的複製件）改版之後清單裡會留著舊結果，而畫面上看不出來。
+   * ⚠️ 這裡的 `input` 是**原樣**（打了什麼就是什麼，載回輸入框時逐字相同）；bonji 的匯出檔把 `input`
+   *    存成正規化後的 ASCII 記法、不另存 `output.ascii`——本 app 兩個都給（`input` 原樣、`output.ascii` 正規化）。 */
+  function normalizeTitle(t) {
+    return typeof t === 'string' ? t.replace(/\s+/g, ' ').trim() : '';
+  }
+
+  // input 全是空白＝沒有東西可記 ⇒ null（呼叫端據此講「沒有可加入的內容」，不加一筆空的）
+  // savedAt＝這一筆內容記下的那一刻（ISO 字串，由呼叫端給）；取代一筆時是取代的那一刻，不是它最初加入的時間
+  function makeRecord(title, input, options, savedAt) {
+    if (typeof input !== 'string' || !input.trim()) return null;
+    return {
+      title: normalizeTitle(title),
+      input: input,
+      options: normalizeOptions(options),
+      savedAt: typeof savedAt === 'string' ? savedAt : ''
+    };
+  }
+
+  // 讀回來的清單：不是陣列當成空的；壞掉的那幾筆丟掉、其餘留著（一筆壞掉不該賠上整份）
+  function normalizeStore(s) {
+    s = (s && typeof s === 'object') ? s : {};
+    var items = [];
+    (Array.isArray(s.items) ? s.items : []).forEach(function (r) {
+      var rec = r && typeof r === 'object' ? makeRecord(r.title, r.input, r.options, r.savedAt) : null;
+      if (rec) items.push(rec);
+    });
+    return { title: normalizeTitle(s.title), items: items };
+  }
+
+  function addRecord(items, rec) {
+    return rec ? items.concat([rec]) : items.slice();
+  }
+
+  // 取代第 i 筆（位置不變——分段的順序就是資料）；i 不在範圍內就原樣回一份
+  function replaceRecord(items, i, rec) {
+    var out = items.slice();
+    if (rec && i >= 0 && i < out.length && Math.floor(i) === i) out[i] = rec;
+    return out;
+  }
+
+  function removeRecord(items, i) {
+    return items.filter(function (_, k) { return k !== i; });
+  }
+
+  /* convert(input, options) → { siddham, latin, ascii, codepoints }（控制器包 SiddhamConverter；lib 不 import 它）。
+   * seq＝在整份清單裡第幾筆；part＝**同一個標題**裡第幾段（標題重複時靠它分段）。
+   * ⚠️ 某一筆轉換丟例外：那一筆 `output: null` 並帶 `error`——不整份失敗，也不安靜地少一筆。 */
+  function buildExport(items, convert, exportedAt) {
+    var seen = {};
+    var records = (Array.isArray(items) ? items : []).map(function (it, i) {
+      var key = 't:' + it.title;
+      seen[key] = (seen[key] || 0) + 1;
+      var rec = {
+        seq: i + 1,
+        part: seen[key],
+        title: it.title,
+        options: it.options,
+        input: it.input,
+        output: null,
+        savedAt: it.savedAt
+      };
+      try {
+        var r = convert(it.input, it.options);
+        rec.output = { siddham: r.siddham, latin: r.latin, ascii: r.ascii, codepoints: r.codepoints };
+      } catch (e) {
+        rec.error = String((e && e.message) || e);
+      }
+      return rec;
+    });
+    return { app: 'bonji-mobile', exportedAt: exportedAt, count: records.length, records: records };
+  }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  // 下載檔名：家族慣例的 yyyyMMddHHmmss（本地時間）
+  function exportFilename(d) {
+    return 'bonji-mobile-' + d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) +
+      pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()) + '.json';
+  }
+
   /* ---------- 小工具 ---------- */
   function num(x) { return typeof x === 'number' && isFinite(x) ? x : NaN; }
   function toInt(x, dflt) { return typeof x === 'number' && isFinite(x) ? Math.floor(x) : dflt; }
@@ -179,6 +272,14 @@
     shellBox: shellBox,
     keyboardOpen: keyboardOpen,
     normalizeOptions: normalizeOptions,
-    normalizeDraft: normalizeDraft
+    normalizeDraft: normalizeDraft,
+    normalizeTitle: normalizeTitle,
+    makeRecord: makeRecord,
+    normalizeStore: normalizeStore,
+    addRecord: addRecord,
+    replaceRecord: replaceRecord,
+    removeRecord: removeRecord,
+    buildExport: buildExport,
+    exportFilename: exportFilename
   };
 })(typeof window !== 'undefined' ? window : globalThis);

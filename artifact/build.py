@@ -11,12 +11,15 @@
 ⚠️ 每一處錨點都要求**恰好命中一次**，否則 exit 1：app 那一側改了而補丁沒跟上時，
    建置會當場失敗，而不是安靜地少打一個補丁。
 
-bonji-mobile 本來就零後端，所以 Artifact 版只差一件事：
+bonji-mobile 本來就零後端，所以 Artifact 版只差兩件事：
   ① `materialize.min.css` 自己託管（vendor/）：Artifact 的 CSP 只允許 fonts.googleapis.com
      當外部樣式表來源，**cdnjs 的樣式表會被擋掉而且不報錯**（整頁沒有樣式）。
      來源 https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css（MIT），
      與 bonji/artifact/vendor/ 那份逐位元組相同。
-  （bonji 的另外四件——backend:false、downloads capability、對照表換頁、不帶 xlsx——這裡都不存在。）
+  ② 紀錄清單的 JSON 下載：沙盒會擋掉 `<a download>`（blob: 也一樣）而且不報錯 ⇒ 改走 `downloads` capability
+     （**發佈時要宣告 `capabilities: {downloads: true}`**）。拿不到就講出來，不假裝下載了；
+     使用者在確認框按取消（`declined`）不是錯誤。Claude iOS App 裡「saved」＝交給系統的分享面板。
+  （bonji 的另外三件——backend:false、對照表換頁、不帶 xlsx——這裡都不存在。）
 
 ⚠️ 字型：只有 Noto Sans Siddham（OFL）。`verify()` 在最後擋著：dist 裡出現別的字型檔就 exit 1。
 ⚠️⚠️ **CBETA 上／下接續的 SVG（`cbeta/cbeta-ligatures.svg`）要隨 Artifacts 版**〔owner 2026-10-09：
@@ -39,9 +42,37 @@ EXCLUDE_NAMES = {'.DS_Store'}
 CDN_CSS = '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" />'
 LOCAL_CSS = '<link rel="stylesheet" href="./materialize.min.css" />'
 
+# 錨點＝ bonji-mobile.js 那支 downloadText 的函式本體（恰好命中一次；那邊改了這裡會建置失敗）。
+# 兩邊的契約相同：回傳 Promise<boolean>——true＝存了、false＝使用者自己取消；其餘失敗 reject，由呼叫端講。
+DOWNLOAD_OLD = """  function downloadText(name, text) {
+    return new Promise(function (resolve) {
+      var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      resolve(true);
+    });
+  }"""
+DOWNLOAD_NEW = """  function downloadText(name, text) {
+    var use = window.claude && window.claude.use;
+    return (use ? window.claude.use('downloads') : Promise.resolve(null)).then(function (dl) {
+      if (!dl) throw new Error('downloads unavailable');
+      return dl.save({ filename: name, data: text }).then(function () { return true; });
+    }).catch(function (err) {
+      if (err && err.code === 'declined') return false;   // 使用者在確認框按了取消，不是錯誤
+      throw err;
+    });
+  }"""
+
 # (相對路徑, 舊, 新)
 PATCHES = [
     ('index.html', CDN_CSS, LOCAL_CSS),
+    ('bonji-mobile.js', DOWNLOAD_OLD, DOWNLOAD_NEW),
 ]
 
 FONT_EXT = {'.ttf', '.otf', '.ttc', '.dfont', '.woff', '.woff2', '.eot'}
@@ -97,6 +128,8 @@ def main():
                 bad.append('含 NUL：' + rel)
             if p.suffix == '.html' and 'cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/' in t:
                 bad.append('仍引用 cdnjs 樣式表：' + rel)
+            if rel == 'bonji-mobile.js' and ('a.download' in t or "claude.use('downloads')" not in t):
+                bad.append('下載仍走 <a download>（沙盒會擋掉且不報錯）：' + rel)
     sprite = out / 'cbeta' / 'cbeta-ligatures.svg'
     if '--no-cbeta' in sys.argv:
         if sprite.exists():
@@ -112,7 +145,7 @@ def main():
         return 1
     print('  ✓ 沒有 Noto 以外的字型、沒有 cdnjs 樣式表')
 
-    print('\n✓ 建置完成。發佈時不需宣告任何 capability。')
+    print('\n✓ 建置完成。發佈時宣告 capabilities: {downloads: true}（紀錄清單的 JSON 下載）。')
     return 0
 
 

@@ -6,7 +6,7 @@
  * 本檔不得直接 import vendor/bonji-input/siddham.js。
  *
  * 碰 DOM 的行為：外殼貼齊可見範圍（fitShell）、即時轉換、記號列、輸入框長高、
- * 選項（bottom-sheet）、複製、主題、語言、工具列開關、草稿保存。
+ * 選項（bottom-sheet）、複製、主題、語言、工具列開關、草稿保存、紀錄清單與 JSON 輸出。
  */
 
 import { SiddhamConverter } from "./siddham-converter.js";
@@ -19,6 +19,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
   var TOOLS_KEY = 'bonji-mobile-tools';   // 'on' | 'off'；手機上預設 off（側鍵會壓在輸出右緣）
   var DRAFT_KEY = 'bonji-mobile-draft';   // { input, options }（BonjiMobileLib.normalizeDraft）
   var KEYSET_KEY = 'bonji-mobile-keyset'; // KEYSET_IDS 之一（lib）：記號列現在是哪一組
+  var REC_KEY = 'bonji-mobile-records';   // { title, items }（BonjiMobileLib.normalizeStore）：紀錄清單
 
   var converter = new SiddhamConverter();
   var setIconDone = window.SideTool.setIconDone;
@@ -29,12 +30,15 @@ import { SiddhamConverter } from "./siddham-converter.js";
   var $inputMethod = document.getElementById('opt-input-method');
   var $translit = document.getElementById('opt-translit');
   var $ignoreSpaces = document.getElementById('opt-ignore-spaces');
+  var $recModal = document.getElementById('records-modal');
+  var $recTitle = document.getElementById('rec-title');
   var out = {
     siddham: document.getElementById('out-siddham'),
     latin: document.getElementById('out-latin')
   };
 
-  var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'vowel', catalog: null, elements: null, catalogFailed: false, sprite: {} };
+  var state = { theme: 'dark', baseline: 0, saveTimer: 0, keyset: 'vowel', catalog: null, elements: null, catalogFailed: false, sprite: {},
+    rec: { title: '', items: [] }, recSaveTimer: 0, storageOk: true, storageWarned: false, armed: null, armTimer: 0 };
 
   /* ---------- 外殼：貼齊可見範圍 ----------
    * iOS Safari 鍵盤彈出時不縮 layout viewport、而且會把頁面往上推；只有 visualViewport
@@ -55,8 +59,9 @@ import { SiddhamConverter } from "./siddham-converter.js";
     root.style.setProperty('--input-max', Math.max(46, Math.round(box.height * 0.3)) + 'px');
 
     // 「鍵盤開著」的基準＝輸入框沒有焦點時量到的高度（那時不可能有鍵盤）
+    // ⚠️ 紀錄面板的標題欄有焦點時鍵盤同樣開著——那時量到的高度不可以拿來當基準
     var focused = document.activeElement === $input;
-    if (!focused) state.baseline = box.height;
+    if (!focused && document.activeElement !== $recTitle) state.baseline = box.height;
     document.body.classList.toggle('kb-open', focused && Lib.keyboardOpen(state.baseline, box.height));
     autosize();
   }
@@ -88,6 +93,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     if (!input) {
       out.siddham.textContent = '';
       out.latin.textContent = '';
+      renderRecCurrent();
       return;
     }
     var r;
@@ -100,6 +106,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     }
     out.siddham.textContent = r.siddham;
     out.latin.textContent = r.latin;
+    renderRecCurrent();
     // 游標在結尾（＝正在往後打）時，兩塊輸出都捲到底，剛打的字才看得到（捲的是外層 .out-value）
     if ($input.selectionEnd === input.length) {
       [out.siddham, out.latin].forEach(function (el) { var box = el.parentNode; box.scrollTop = box.scrollHeight; });
@@ -249,7 +256,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
   }
 
   /* ---------- 複製 ---------- */
-  function copyText(text) {
+  // host：退回 execCommand 時那個暫用 textarea 掛在哪裡。⚠️ Materialize 的 modal 開著時會把跑到它外面的焦點
+  //       搶回自己身上（focus trap）⇒ 掛在 body 上的 textarea 選不住；從 modal 裡複製就傳那個 modal。
+  function copyText(text, host) {
+    host = host || document.body;
     function fallback() {
       return new Promise(function (resolve, reject) {
         try {
@@ -260,10 +270,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
           ta.style.top = '0';
           ta.style.left = '0';
           ta.style.opacity = '0';
-          document.body.appendChild(ta);
+          host.appendChild(ta);
           ta.select();
           var ok = document.execCommand('copy');
-          document.body.removeChild(ta);
+          host.removeChild(ta);
           ok ? resolve() : reject(new Error('execCommand copy failed'));
         } catch (e) { reject(e); }
       });
@@ -319,6 +329,312 @@ import { SiddhamConverter } from "./siddham-converter.js";
     var d = null;
     try { d = raw ? JSON.parse(raw) : null; } catch (e) {}
     return Lib.normalizeDraft(d);
+  }
+
+  /* ---------- 紀錄清單・JSON 輸出 ----------
+   * 一筆紀錄＝標題＋當時的輸入＋當時的選項（lib 的 makeRecord）。**標題可以重複、可以留空**〔owner 2026-10-11〕：
+   * 一部咒語分好幾段記，每一段掛同一個標題 ⇒ 加入時不查重、不覆寫。
+   * 悉曇／拉丁／碼位不存：列清單與輸出 JSON 的當下，每一筆用**它自己的**選項現算（convertWith）。
+   * ⚠️ 清單存在 localStorage——**那是這支瀏覽器的方便，不是備份**：可能不在、會丟例外、或（iOS 上的 Artifacts 版）
+   *    寫得進讀不回。每次存完讀回來比對，對不上就在面板上講出來（不講的話看起來像 app 把清單弄丟了）。
+   * ⚠️ 沒有 window.confirm：Artifacts 的 iframe 裡它不跳對話框、直接回 false ⇒ 會毀掉東西的動作
+   *    （取代／刪除／全部清除／載回時蓋掉還沒記下的輸入）一律「再按一次」。 */
+  function convertWith(input, options) {
+    return new SiddhamConverter(options).convert(input);
+  }
+
+  function loadRecords() {
+    var raw = null, d = null;
+    try { raw = localStorage.getItem(REC_KEY); } catch (e) {}
+    try { d = raw ? JSON.parse(raw) : null; } catch (e) {}
+    return Lib.normalizeStore(d);
+  }
+
+  function saveRecords() {
+    clearTimeout(state.recSaveTimer);
+    var text = JSON.stringify(state.rec);
+    var ok = false;
+    try { localStorage.setItem(REC_KEY, text); ok = localStorage.getItem(REC_KEY) === text; } catch (e) {}
+    state.storageOk = ok;
+    document.getElementById('rec-storage-note').hidden = ok;
+    // 面板沒開的時候（悉曇欄底下那顆加入鈕）使用者看不到面板上那行字 ⇒ 第一次存不住時講一次
+    if (!ok && !state.storageWarned && state.rec.items.length) {
+      state.storageWarned = true;
+      M.toast({ html: _esc(I18n.t('rec.storageFail')), classes: 'orange', displayLength: 6000 });
+    }
+  }
+  function saveRecordsSoon() {
+    clearTimeout(state.recSaveTimer);
+    state.recSaveTimer = setTimeout(saveRecords, 300);
+  }
+
+  function currentRecord() {
+    return Lib.makeRecord($recTitle.value, $input.value, readOptions(), new Date().toISOString());
+  }
+  function titleOr(t) { return t || I18n.t('rec.untitled'); }
+  function recToast(key, params, cls, ms) {
+    M.toast({ html: _esc(I18n.t(key, params)), classes: cls, displayLength: ms || 4000 });
+  }
+
+  /* 「再按一次」：第一次按只上膛（鈕變成打勾、toast 講清楚再按一次會發生什麼），4 秒內再按同一顆才執行。 */
+  function isArmed(act, i) { return !!state.armed && state.armed.act === act && state.armed.i === i; }
+  function disarm() {
+    clearTimeout(state.armTimer);
+    state.armed = null;
+  }
+  function arm(act, i, key, params) {
+    disarm();
+    state.armed = { act: act, i: i };
+    state.armTimer = setTimeout(function () { state.armed = null; renderRecords(); }, 4000);
+    renderRecords();
+    recToast(key, params, 'orange');
+  }
+
+  function addCurrent(trigger) {
+    var rec = currentRecord();
+    if (!rec) { recToast('rec.toast.nothing', null, 'orange'); return; }
+    disarm();
+    state.rec.items = Lib.addRecord(state.rec.items, rec);
+    state.rec.title = rec.title;
+    saveRecords();
+    renderRecords();
+    setIconDone(trigger);
+    // 短一點：toast 在頁首上方，停太久會擋住紀錄鈕（加完常常接著就要開面板）
+    recToast('rec.toast.added', { n: state.rec.items.length, t: titleOr(rec.title) }, 'teal', 1800);
+  }
+
+  function recAction(act, i) {
+    var items = state.rec.items;
+    var n = i + 1;
+    if (act === 'clear') {
+      if (!items.length) return;
+      if (!isArmed(act, -1)) { arm(act, -1, 'rec.toast.confirmClear', { n: items.length }); return; }
+      disarm();
+      state.rec.items = [];
+      saveRecords();
+      renderRecords();
+      recToast('rec.toast.cleared', { n: items.length }, 'grey');
+      return;
+    }
+    var it = items[i];
+    if (!it) return;
+    if (act === 'load') {
+      // 輸入框裡有還沒記下、而且與這一筆不同的內容 ⇒ 載回會把它蓋掉，先講一次
+      var dirty = !!$input.value.trim() && $input.value !== it.input;
+      if (dirty && !isArmed(act, i)) { arm(act, i, 'rec.toast.confirmLoad', { n: n }); return; }
+      disarm();
+      $recTitle.value = it.title;
+      state.rec.title = it.title;
+      $inputMethod.value = it.options.inputMethod;
+      $translit.value = it.options.transliteration;
+      $ignoreSpaces.checked = it.options.ignoreSpacesAndHyphens;
+      $input.value = it.input;
+      saveRecords();
+      onInput();
+      M.Modal.getInstance($recModal).close();
+      recToast('rec.toast.loaded', { n: n, t: titleOr(it.title) }, 'teal');
+      return;
+    }
+    if (act === 'replace') {
+      var rec = currentRecord();
+      if (!rec) { recToast('rec.toast.nothing', null, 'orange'); return; }
+      if (!isArmed(act, i)) { arm(act, i, 'rec.toast.confirmReplace', { n: n }); return; }
+      disarm();
+      state.rec.items = Lib.replaceRecord(items, i, rec);
+      state.rec.title = rec.title;
+      saveRecords();
+      renderRecords();
+      recToast('rec.toast.replaced', { n: n }, 'teal');
+      return;
+    }
+    if (act === 'remove') {
+      if (!isArmed(act, i)) { arm(act, i, 'rec.toast.confirmRemove', { n: n }); return; }
+      disarm();
+      state.rec.items = Lib.removeRecord(items, i);
+      saveRecords();
+      renderRecords();
+      recToast('rec.toast.removed', { n: n }, 'grey');
+    }
+  }
+
+  // 面板上「目前的輸入」那一格＝按「加入清單」會記下的那一段（空的時候加入鈕停用）
+  function renderRecCurrent() {
+    var box = document.getElementById('rec-current');
+    var has = !!$input.value.trim();
+    box.textContent = has ? out.siddham.textContent : I18n.t('rec.currentEmpty');
+    box.classList.toggle('siddham-text', has);
+    box.classList.toggle('is-empty', !has);
+    document.getElementById('rec-add').classList.toggle('disabled', !has);
+  }
+
+  function node(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  function recButton(act, i, icon, titleKey, danger) {
+    var armed = isArmed(act, i);
+    var a = node('a', 'rec-btn' + (danger ? ' rec-danger' : '') + (armed ? ' armed' : ''));
+    a.href = '#!';
+    a.setAttribute('data-act', act);
+    a.setAttribute('data-i', String(i));
+    a.setAttribute('title', I18n.t(titleKey));
+    a.setAttribute('aria-label', I18n.t(titleKey));
+    a.appendChild(node('i', 'material-icons', armed ? 'check' : icon));
+    return a;
+  }
+
+  // JSON 輸出的文字：畫面上那一份＝複製／下載的那一份（每次現算，exportedAt 是那一刻）。清單是空的回 ''。
+  function refreshJson() {
+    var exp = Lib.buildExport(state.rec.items, convertWith, new Date().toISOString());
+    var text = exp.count ? JSON.stringify(exp, null, 2) : '';
+    var pre = document.getElementById('rec-json');
+    pre.textContent = text || I18n.t('rec.jsonEmpty');
+    pre.classList.toggle('is-empty', !text);
+    return { exp: exp, text: text };
+  }
+
+  function renderRecords() {
+    var items = state.rec.items;
+    var badge = document.getElementById('rec-count');
+    badge.textContent = items.length ? String(items.length) : '';
+    badge.hidden = !items.length;
+    document.getElementById('rec-list-title').textContent = I18n.t('rec.list', { n: items.length });
+
+    var clearBtn = document.getElementById('rec-clear');
+    clearBtn.hidden = !items.length;
+    clearBtn.classList.toggle('armed', isArmed('clear', -1));
+    clearBtn.querySelector('i').textContent = isArmed('clear', -1) ? 'check' : 'delete_sweep';
+
+    var exp = refreshJson().exp;
+    var total = {};   // 同一個標題共有幾段——只有一段的不必標「第 1 段」
+    exp.records.forEach(function (r) { total['t:' + r.title] = (total['t:' + r.title] || 0) + 1; });
+
+    var list = document.getElementById('rec-list');
+    list.textContent = '';
+    if (!items.length) {
+      list.appendChild(node('li', 'rec-empty', I18n.t('rec.empty')));
+    }
+    exp.records.forEach(function (r, i) {
+      var li = node('li', 'rec-item');
+      var main = node('a', 'rec-main' + (isArmed('load', i) ? ' armed' : ''));
+      main.href = '#!';
+      main.setAttribute('data-act', 'load');
+      main.setAttribute('data-i', String(i));
+      main.setAttribute('title', I18n.t('rec.load'));
+      var head = node('span', 'rec-head');
+      head.appendChild(node('span', 'rec-seq', String(r.seq)));
+      head.appendChild(node('span', 'rec-name' + (r.title ? '' : ' is-empty'), titleOr(r.title)));
+      if (total['t:' + r.title] > 1) head.appendChild(node('span', 'rec-part', I18n.t('rec.part', { p: r.part })));
+      main.appendChild(head);
+      // 轉不出來的那一筆把原因寫在原本放悉曇的那一行——不留白
+      main.appendChild(r.output
+        ? node('span', 'rec-sid', r.output.siddham)
+        : node('span', 'rec-err', I18n.t('toast.convertFail', { m: r.error || '' })));
+      main.appendChild(node('span', 'rec-in mono', r.input));
+      li.appendChild(main);
+      li.appendChild(recButton('replace', i, 'system_update_alt', 'rec.replace', false));
+      li.appendChild(recButton('remove', i, 'delete', 'rec.remove', true));
+      list.appendChild(li);
+    });
+    renderRecCurrent();
+  }
+
+  function openRecords() {
+    $input.blur();   // 先收鍵盤（同選項面板）
+    disarm();
+    renderRecords();
+    M.Modal.getInstance($recModal).open();
+    // modal-fixed-footer ⇒ 捲動的是 .modal-content，它會留在上次關掉時的位置；歸零要在 open() 之後（之前是 display:none）
+    $recModal.querySelector('.modal-content').scrollTop = 0;
+  }
+
+  /* 下載一段文字。回傳 Promise<boolean>：true＝交給瀏覽器了；false＝使用者自己取消（不是錯誤、不必講）。
+   * ⚠️ Artifacts 版的沙盒會擋掉 <a download>（blob: 也一樣）而且不報錯
+   *    ⇒ artifact/build.py 把這一整支換成走 downloads capability 的版本（錨點就是這支函式的全文，改這裡那邊會建置失敗）。 */
+  function downloadText(name, text) {
+    return new Promise(function (resolve) {
+      var blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      resolve(true);
+    });
+  }
+
+  function copyJson(trigger) {
+    var text = refreshJson().text;
+    if (!text) { recToast('rec.toast.empty', null, 'orange'); return; }
+    copyText(text, $recModal).then(function () {
+      setIconDone(trigger);
+      M.toast({ html: _esc(I18n.t('toast.copied')), classes: 'teal' });
+    }).catch(function () {
+      M.toast({ html: _esc(I18n.t('toast.copyFail')), classes: 'red' });
+    });
+  }
+
+  function downloadJson(trigger) {
+    var text = refreshJson().text;
+    if (!text) { recToast('rec.toast.empty', null, 'orange'); return; }
+    var name = Lib.exportFilename(new Date());
+    downloadText(name, text).then(function (done) {
+      if (!done) return;
+      setIconDone(trigger);
+      recToast('toast.downloaded', { n: name }, 'teal');
+    }).catch(function (err) {
+      recToast('rec.toast.downloadFail', { m: String((err && (err.message || err.code)) || err) }, 'red');
+    });
+  }
+
+  function bindRecords() {
+    document.getElementById('open-records').addEventListener('click', function (e) {
+      e.preventDefault();
+      openRecords();
+    });
+
+    // 悉曇欄底下那顆：正在打字時按它不該讓鍵盤收起來（打一段、加一筆、接著打下一段）
+    var quick = document.getElementById('rec-add-quick');
+    quick.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    quick.addEventListener('click', function (e) { e.preventDefault(); addCurrent(quick); });
+
+    document.getElementById('rec-add').addEventListener('click', function (e) {
+      e.preventDefault();
+      addCurrent(e.currentTarget);
+    });
+    document.getElementById('rec-clear').addEventListener('click', function (e) {
+      e.preventDefault();
+      recAction('clear', -1);
+    });
+    document.getElementById('rec-list').addEventListener('click', function (e) {
+      var a = e.target.closest('[data-act]');
+      if (!a) return;
+      e.preventDefault();
+      recAction(a.getAttribute('data-act'), parseInt(a.getAttribute('data-i'), 10));
+    });
+    document.getElementById('rec-copy').addEventListener('click', function (e) {
+      e.preventDefault();
+      copyJson(e.currentTarget);
+    });
+    document.getElementById('rec-download').addEventListener('click', function (e) {
+      e.preventDefault();
+      downloadJson(e.currentTarget);
+    });
+
+    // 標題：邊打邊存（不改寫欄位裡的字——正規化只發生在記下來的那一刻）
+    $recTitle.addEventListener('input', function () {
+      state.rec.title = Lib.normalizeTitle($recTitle.value);
+      saveRecordsSoon();
+    });
+    $recTitle.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); $recTitle.blur(); }   // 單行欄位：Enter＝打完了，收鍵盤
+    });
+    $recTitle.addEventListener('blur', function () { setTimeout(fitShell, 0); });
   }
 
   /* ---------- 主題 / 語言 / 工具列開關 ---------- */
@@ -380,6 +696,7 @@ import { SiddhamConverter } from "./siddham-converter.js";
     keysetBtn.addEventListener('mousedown', function (e) { e.preventDefault(); });
     keysetBtn.addEventListener('click', function (e) { e.preventDefault(); toggleKeyset(); });
     document.addEventListener('i18n:changed', function () {
+      renderRecords();   // 清單裡的「第 n 段」「（無標題）」與空狀態跟著語言走
       renderKeysetToggle();
       if (!Lib.keysFor(state.catalog, state.elements, state.keyset).length) renderKeybar();   // 失敗說明跟著語言走
     });
@@ -435,6 +752,10 @@ import { SiddhamConverter } from "./siddham-converter.js";
     M.Modal.init(document.getElementById('options-modal'), {
       onCloseStart: function () { saveDraftSoon(); }
     });
+    // onCloseStart 而不是 onCloseEnd：背景分頁裡動畫不推進，End 不會來（家族 memory animation-complete-callbacks-stall）
+    M.Modal.init($recModal, {
+      onCloseStart: function () { $recTitle.blur(); disarm(); saveRecords(); }
+    });
 
     var saved = 'dark';
     try { saved = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) {}
@@ -457,10 +778,24 @@ import { SiddhamConverter } from "./siddham-converter.js";
     state.keyset = Lib.normalizeKeyset(ks);
     renderKeysetToggle();
 
+    state.rec = loadRecords();
+    $recTitle.value = state.rec.title;
+    // 探針：寫進去再讀回來比對（問「localStorage 在不在」永遠回「在」）。⚠️ 只證明這一刻存得住，證明不了撐得過關掉頁面
+    var probeOk = false;
+    try {
+      localStorage.setItem(REC_KEY + '-probe', '1');
+      probeOk = localStorage.getItem(REC_KEY + '-probe') === '1';
+      localStorage.removeItem(REC_KEY + '-probe');
+    } catch (e) {}
+    state.storageOk = probeOk;
+    document.getElementById('rec-storage-note').hidden = probeOk;
+
     bindKeybar();
     bindEvents();
+    bindRecords();
     fitShell();
     convert();
+    renderRecords();
     loadCatalog().then(function () { renderKeybar(); fitShell(); });
   }
 
