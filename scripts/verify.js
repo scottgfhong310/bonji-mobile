@@ -346,11 +346,12 @@ check('㉓ 複製鈕在欄位底部', (w) => {
   return bad.length ? 'FAIL: ' + bad.join('、') + ' 的複製鈕不在捲動框之後的 .out-foot 裡' : true;
 });
 
-// ㉔ 記號列六組的順序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續〔owner 2026-10-08／09：母音在體文前、異體字在母音後、上下接續在體文後〕。
+// ㉔ 記號列七組的順序：母音 → 異體字 → 接續 → 體文 → 上接續 → 下接續 → 符號〔owner 2026-10-11 逐項指定；
+//    在那之前是 母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續（→ 符號），接續被移到體文前面〕。
 //    切換鈕依 KEYSET_IDS 的順序循環、預設是第一組 ⇒ 順序本身就是規格。
-check('㉔ 記號列七組依序：母音 → 異體字 → 體文 → 上接續 → 下接續 → 接續 → 符號', (w) => {
+check('㉔ 記號列七組依序：母音 → 異體字 → 接續 → 體文 → 上接續 → 下接續 → 符號', (w) => {
   const ids = w.Lib.KEYSET_IDS.join(',');
-  if (ids !== 'vowel,variant,bindu,ligature_u,ligature_l,ligature,symbol') return 'FAIL: KEYSET_IDS = ' + ids;
+  if (ids !== 'vowel,variant,ligature,bindu,ligature_u,ligature_l,symbol') return 'FAIL: KEYSET_IDS = ' + ids;
   // 符號〔owner 2026-10-11〕：catalog 的 symbol 類整組都收（全是 Unicode 悉曇）；字形對不對由 ② 逐一驗，這裡只確認它不是空的、而且句讀 `|` `||` 在裡面
   const sym = w.Lib.keysFromCatalog(w.catalog, 'symbol');
   const want = (w.catalog.categories.find((c) => c.id === 'symbol') || { entries: [] }).entries.filter((e) => e.group === 'siddham').length;
@@ -754,12 +755,13 @@ const MUTANTS = [
   ['㉒', '文字不靠底', (w) => { w.css = w.css.replace(/(^\.out-text\s*\{[^}]*?)margin-top:\s*auto;/m, '$1'); }],
   ['㉒', '聚焦時仍墊底部安全區', (w) => { w.css = w.css.replace('.shell:has(#bm-input:focus) { padding-bottom: 0; }', ''); }],
   ['㉓', '拉丁欄的複製列搬回頂端', (w) => { w.html = w.html.replace(/(<div class="out-block out-block-latin">\n)(        <div class="out-value">.*\n)((?:.*\n){6})/, '$1$3$2'); }],
-  ['㉔', '母音排到體文後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 4, 'variant', 'bindu', 'vowel', 'ligature'); }],
+  ['㉔', '母音排到體文後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 4, 'variant', 'ligature', 'bindu', 'vowel'); }],
   ['㉔', '異體字組少一格', (w) => { const c = w.catalog.categories.find((x) => x.id === 'variant'); c.entries = c.entries.filter((e) => e.code !== '_ii'); }],
   ['②', '__u 不再轉出 𑗛（轉換層副作用消失）', (w) => { const c = w.catalog.categories.find((x) => x.id === 'variant'); c.entries.find((e) => e.code === '__u').code = '_u'; }],
   ['⑭', '少了 keyset.vowel 的文案', (w) => { delete w.locales['zh-Hant']['keyset.vowel']; delete w.locales.en['keyset.vowel']; delete w.locales.ja['keyset.vowel']; }],
   ['㉔', '上接續被去重（少了同記法的異體）', (w) => { const f = w.Lib.keysFor; w.Lib.keysFor = (c, e, id) => { const ks = f(c, e, id); const seen = {}; return id === 'ligature_u' ? ks.filter((k) => !seen[k.ins] && (seen[k.ins] = 1)) : ks; }; }],
-  ['㉔', '上下接續排到接續後面', (w) => { w.Lib.KEYSET_IDS.splice(0, 6, 'vowel', 'variant', 'bindu', 'ligature', 'ligature_u', 'ligature_l'); }],
+  ['㉔', '接續排回體文後面（2026-10-11 之前的順序）', (w) => { w.Lib.KEYSET_IDS.splice(0, 7, 'vowel', 'variant', 'bindu', 'ligature_u', 'ligature_l', 'ligature', 'symbol'); }],
+  ['㉔', '接續與體文對調之外，上下接續也排到體文前面', (w) => { w.Lib.KEYSET_IDS.splice(0, 7, 'vowel', 'variant', 'ligature', 'ligature_u', 'ligature_l', 'bindu', 'symbol'); }],
   ['㉔', '符號組被拿掉', (w) => { w.Lib.KEYSET_IDS.pop(); }],
   ['㉔', '符號組少了句讀', (w) => { const c = w.catalog.categories.find((x) => x.id === 'symbol'); c.entries = c.entries.filter((e) => e.code !== '||'); const f = w.Lib.keysFromCatalog; w.Lib.keysFromCatalog = (cat, id) => f(cat, id); }],
   ['②', '符號的字形錯一格', (w) => { w.catalog.categories.find((c) => c.id === 'symbol').entries.find((e) => e.code === '|').char = '𑗉'; }],

@@ -4,8 +4,8 @@
  * 悉曇轉換本身不在這裡：唯一的轉換介面是 ./siddham-converter.js（ESM 防腐層，
  * bonji 的 byte-identical 複製件）。本檔放的是**這支 app 自己的、離開畫面仍成立**的邏輯：
  *
- *   KEYSET_IDS                 記號列的七組（切換順序）：'vowel'（母音）→ 'variant'（異體字）→ 'bindu'（體文）
- *                              → 'ligature_u'（上接續）→ 'ligature_l'（下接續）→ 'ligature'（接續）→ 'symbol'（符號）
+ *   KEYSET_IDS                 記號列的七組（切換順序）：'vowel'（母音）→ 'variant'（異體字）→ 'ligature'（接續）→ 'bindu'（體文）
+ *                              → 'ligature_u'（上接續）→ 'ligature_l'（下接續）→ 'symbol'（符號）
  *   keysFromCatalog(cat, id)   → [{ ins, glyph }] —— 由 bonji 的 data/catalog.json 推出該組的鍵
  *   keysFromElements(el, id)   → [{ ins, cbeta }] —— 由 data/element-catalog.json 的 Cbeta 群推出（上／下接續）
  *   keysFor(cat, el, id)       → 依組別分派到上面兩支
@@ -37,7 +37,9 @@
 
   /* ---------- 記號列 ----------
    * 手機鍵盤上 `;` `.` `,` `~` 要切到符號頁才打得到，而這套記法幾乎每個字都要用
-   * ⇒ 做成一鍵插入，分四組切換（輸入框右側那顆鈕，依此順序循環；母音排第一、異體字緊接其後〔owner 2026-10-08〕）：
+   * ⇒ 做成一鍵插入，分七組切換（輸入框右側那顆鈕，依 KEYSET_IDS 的順序循環）。
+   *    ⭐ **順序是 owner 逐項指定的**〔2026-10-11：母音 → 異體字 → 接續 → 體文 → 上接續 → 下接續 → 符號〕——
+   *       打一個音節的手順是「子音（接續）→ 母音符號與點畫（體文）」，所以接續排在體文前面。下面各組的說明不照這個順序排：
    *   母音 vowel    —— 獨立母音（`a` `aa` `i` … `au` `a;m` `a~m` `a.h`）
    *   異體字 variant —— 獨立母音的異體（`__i` 𑗘 `_i` 𑗙 `_ii` 𑗚 `__u` 𑗛；Mojikyo 那 3 格沒有記法、group 也不是 siddham，不會進來）
    *                    ⚠️ `__u` 不是引擎的記法：引擎的 u 異體是 `_u`，而轉換層把 `_u` 定義成替代母音符號 𑗜，
@@ -55,8 +57,8 @@
    * 同一組裡同一個記法只留第一個（現況 0 個重複；防的是 xlsx 日後多一列）。 */
   // 符號 symbol〔owner 2026-10-11〕—— catalog 的 symbol 類：句讀與章節記號（`|` 𑗅 `||` 𑗉 `--` `,,` `..` `*` `2` `@` `=`）
   //   與裝飾記號（`*1`～`*7` `*0` `o2` `o2x` `ox2`～`ox4` `oxx`）。全是 Unicode 悉曇（group siddham），Noto 畫得出來。
-  //   排在最後：一段裡用得到的次數最少（多半只在結尾），不該擋在打字時常切的那幾組前面。
-  var KEYSET_IDS = ['vowel', 'variant', 'bindu', 'ligature_u', 'ligature_l', 'ligature', 'symbol'];
+  //   排在最後〔owner 2026-10-11 指定的順序〕。
+  var KEYSET_IDS = ['vowel', 'variant', 'ligature', 'bindu', 'ligature_u', 'ligature_l', 'symbol'];
   // 這兩組的資料不在 catalog.json（那裡只有 Mojikyo 群），而在 element-catalog.json 的 Cbeta 群
   var ELEMENT_SETS = { ligature_u: true, ligature_l: true };
 
