@@ -111,7 +111,8 @@ owner 在 iPhone 的 Claude App 裡打字的截圖顯示兩件事，**成因是�
 - `siddham-converter.js`（防腐層）與 `vendor/bonji-input/`（MIT、釘選 `0a7eadd…`）是 **bonji 的 byte-identical 複製件**，權威版在 bonji。
   **改就改 bonji 再同步**；本 repo 就地改會讓兩支 app 的轉換結果分岔，而畫面上看不出來。
 - ⚠️ **從 bonji 複製，不是從 `tibetan-siddham`**：那一份 vendored 引擎與 bonji 的不同（多了 14 個項目，2026-10-08 實查），
-  而樹根 CLAUDE.md 寫的是兩者「同一支」。這件事尚未釐清，不在本 app 範圍內。
+  ✅ 2026-10-11 已釐清：bonji 這一份是原樣的上游；`tibetan-siddham` 那一份＝上游＋原型階段加的 14 個符號記法
+  （清單在它的 `vendor/bonji-input/SOURCE.md`）。樹根 CLAUDE.md 原寫兩者「同一支」，已同批訂正。
 - 原生 ESM 的偏離同 bonji：引擎是純 ESM，控制器以 `<script type="module">` 載入；`bonji-mobile-lib.js` 仍是 IIFE → `window.BonjiMobileLib`。
 - **lib 放的是本 app 自己的純邏輯**：記號列定義、游標插入、可見範圍算式、鍵盤判準、選項／草稿白名單。
 
