@@ -146,6 +146,9 @@ export class SiddhamConverter {
      *   不論 ignore 與否。拉丁轉寫則保留「-」（由 ascii2latin 處理，本函式不碰）。
      * - 空格：ignore=true 時移除「可見空格」但仍視為 token 邊界（故「n a」→𑖡𑖿𑖀＝
      *   子音+獨立母音，而非併成音節 𑖡）；ignore=false 時交給引擎保留為字面空格。
+     * - 兩個空格（ignore=true 時）＝一個半形空格：在悉曇欄它與連字號等效——兩側各自成組、中間補一個空格，
+     *   貼著行首行尾時不輸出。ignore=false 時不適用（空格本來就原樣留著，兩個就是兩個）。
+     *   拉丁不在這裡處理、照舊保留那兩個空格（這是它與連字號唯一的差別）。
      * - 三個空格＝一個全形空格（U+3000），不論 ignore 與否；由左而右每三個一組，剩下的一個或
      *   兩個照上一條。它同樣是 token 邊界（「n␣␣␣a」→ 𑖡𑖿＋U+3000＋𑖀），而且不被 trim 掉（行首可
      *   用來縮排）。拉丁與 ascii 不在這裡處理、照舊保留那三個空格。
@@ -156,7 +159,9 @@ export class SiddhamConverter {
      */
     static toSiddham(ascii, ignore) {
         return ascii.split("\n")
-            .map((line) => line.split("   ").join(WIDE_SPACE_PADDED).split(/-+/)
+            .map((line) => (ignore
+                ? line.split("   ").join(WIDE_SPACE_PADDED).split("  ").join("-") // 先取三個一組，剩下的兩個當成連字號
+                : line.split("   ").join(WIDE_SPACE_PADDED)).split(/-+/)
                 .map((group) => {
                     group = group.trim()
                     if (!group) return ""
