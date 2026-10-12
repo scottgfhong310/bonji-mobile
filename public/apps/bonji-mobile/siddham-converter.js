@@ -13,7 +13,7 @@ const DOTTED = "◌" // ◌ 點圈載體（顯示用，與對照表 §7.1 一致
 
 // ── 三個半形空格 → 一個全形空格（只在悉曇輸出；DESIGN §5.3）────────────────────────────
 // 與補充符號同一招：先換成一個私用區 sentinel（引擎原樣 echo），轉完再換成 U+3000。
-// - 不直接換成 U+3000：它是空白字元，toSiddham 的 trim() 會把貼著邊緣的它吃掉（連相鄰的換行一起）。
+// - 不直接換成 U+3000：它是空白字元，toSiddham 的 trim() 會把貼著行首行尾或「-」的它吃掉。
 // - sentinel 兩側各墊一個 tab：引擎判斷「: 是不是字面冒號」看的是它旁邊有沒有空白（\s），
 //   不墊的話「ka:␣␣␣ma」的冒號會由字面冒號變成分隔符。墊 tab 不墊空格，是為了換回 U+3000 時
 //   收得乾淨——墊空格的話會分不出哪一個是墊的、哪一個是使用者的（或連字號補的）那個空格。
@@ -139,6 +139,9 @@ export class SiddhamConverter {
     /**
      * ascii → 悉曇字串（引擎本身不修改，邊界語意在此層處理）。
      *
+     * - 逐行轉：每一行都當成單獨輸入的一行，下面三條都是「一行之內」的規則。換行永遠原樣留著，
+     *   所以悉曇的行數＝輸入的行數（HTML 片段是逐行把悉曇與拉丁配對的，少一行就整段錯位）。
+     *   在這之前是整段一起轉，trim() 會把貼著「-」或整段頭尾的換行吃掉（「ka-⏎ma」只剩一行）。
      * - 連字號「-」＝「詞組分隔」：在悉曇輸出中一律算一個空格（兩組子音字以空格分開），
      *   不論 ignore 與否。拉丁轉寫則保留「-」（由 ascii2latin 處理，本函式不碰）。
      * - 空格：ignore=true 時移除「可見空格」但仍視為 token 邊界（故「n a」→𑖡𑖿𑖀＝
@@ -152,17 +155,19 @@ export class SiddhamConverter {
      * @returns {string}
      */
     static toSiddham(ascii, ignore) {
-        return ascii.split("   ").join(WIDE_SPACE_PADDED).split(/-+/)
-            .map((group) => {
-                group = group.trim()
-                if (!group) return ""
-                return ignore
-                    ? group.split(/ +/).filter(Boolean).map((seg) => ascii2siddham(seg)).join("")
-                    : ascii2siddham(group, { ignoreSpacesAndHyphens: false })
-            })
-            .filter((s) => s !== "")
-            .join(" ")
-            .replace(WIDE_SPACE_PADDED_RE, WIDE_SPACE)
+        return ascii.split("\n")
+            .map((line) => line.split("   ").join(WIDE_SPACE_PADDED).split(/-+/)
+                .map((group) => {
+                    group = group.trim()
+                    if (!group) return ""
+                    return ignore
+                        ? group.split(/ +/).filter(Boolean).map((seg) => ascii2siddham(seg)).join("")
+                        : ascii2siddham(group, { ignoreSpacesAndHyphens: false })
+                })
+                .filter((s) => s !== "")
+                .join(" ")
+                .replace(WIDE_SPACE_PADDED_RE, WIDE_SPACE))
+            .join("\n")
     }
 
     /**
