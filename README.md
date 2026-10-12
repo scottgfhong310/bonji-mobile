@@ -16,7 +16,7 @@ Part of the **nodeapp WebApp family**: <https://github.com/scottgfhong310/nodeap
 - **Options** (`tune`, top right): input method (ISO 15919 / Kyoto-Harvard), transliteration (ISO 15919 / IAST), ignore spaces & hyphens.
 - **Two spaces = one space** (with *ignore spaces* on): the Siddhaṁ output gets one ordinary space between those two characters; the Latin output keeps the two spaces as typed.
 - **Three spaces = one full-width space**: type three consecutive spaces and the Siddhaṁ output gets one ideographic space (U+3000), whether or not "ignore spaces" is on. The Latin output keeps the three spaces as typed.
-- **Records · JSON output** (`{}`, top right): save the current input as a record with a **title**, then output the whole list as JSON (copy or download). **Titles may be empty and may repeat** — record one mantra in several parts under the same title, and `part` in the output tells them apart. While typing, the add button under the Siddhaṁ column saves a record without closing the keyboard. The list lives in your browser (not a backup); the Claude Artifacts build keeps it in the artifact’s database instead, so it survives closing and switching devices.
+- **Records · JSON output** (`{}`, top right): save the current input as a record with a **title**, then output the whole list as JSON (copy or download). **Titles may be empty and may repeat** — record one mantra in several parts under the same title, and `part` in the output tells them apart. While typing, the add button under the Siddhaṁ column saves a record without closing the keyboard. Each record has an edit button (✎) to change its title, notation and options in place. The list lives in your browser (not a backup); the Claude Artifacts build keeps it in the artifact’s database instead, so it survives closing and switching devices.
 - Copy buttons on both outputs; example chips; input and options are kept as a draft in your browser only.
 - Bundled **Noto Sans Siddham** (SIL OFL); three UI languages (`zh-Hant` / `en` / `ja`); light / dark themes.
 - **No backend**: the server only serves static files. A [Claude Artifacts build](https://claude.ai/artifact/WcKaiazaQr5C21Ktnc34TG) (private) also exists.
@@ -51,7 +51,7 @@ npm run verify            # contract checks
         "ascii": "na mo ra tna tra yaa ya",    // normalised ASCII notation
         "codepoints": "U+115A1 U+115A6 …"
       },
-      "savedAt": "2026-10-11T01:00:00.000Z"    // when this record was saved (or last replaced)
+      "savedAt": "2026-10-11T01:00:00.000Z"    // when this record was saved (or last replaced / edited)
     },
     { "seq": 2, "part": 2, "title": "大悲咒", "…": "…" }
   ]

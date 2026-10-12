@@ -22,6 +22,8 @@
  *   nextOrder(items, now)      → 新的一筆的排序值（一定排在現有每一筆之後）
  *   mergeRemote(remote, put, del) → 遠端清單 ⊕ 這個畫面還沒被確認的寫入，依 order 排（Artifacts 版的同步用）
  *   addRecord／replaceRecord／removeRecord(items, …) → 新陣列（不改輸入）
+ *   indexOfId(items, id)       → 那一筆現在在第幾格（找不到 -1）
+ *   editRecord(orig, t, i, o, iso) → 編輯後的那一筆（id／order 沿用）；沒有更動回 orig 本身、input 清空回 null
  *   buildExport(items, convert, iso) → JSON 輸出的那個物件（輸出是匯出當下**算出來的**，不落地）
  *   exportFilename(date)       → `bonji-mobile-yyyyMMddHHmmss.json`
  *
@@ -272,6 +274,27 @@
     return items.filter(function (_, k) { return k !== i; });
   }
 
+  // 以 id 找那一筆現在在第幾格（找不到回 -1）。編輯表單開著的期間清單可能被別處換過——序號不可靠，id 才是那一筆
+  function indexOfId(items, id) {
+    var list = Array.isArray(items) ? items : [];
+    if (typeof id !== 'string' || !id) return -1;
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].id === id) return i;
+    return -1;
+  }
+
+  /* 編輯某一筆〔owner 2026-10-13〕：改的是那一筆**自己的**標題／輸入／選項；身分（id）與位置（order）沿用。
+   *   沒有任何更動 ⇒ 回**原來那個物件**（呼叫端據此不寫入——沒改的那一筆，savedAt 不該變成今天）
+   *   輸入被清空   ⇒ null（一筆紀錄不可以沒有內容；要拿掉它是「刪除」那顆鈕的事，不是編輯的副作用）
+   * 不改傳進來的東西。 */
+  function editRecord(orig, title, input, options, savedAt) {
+    if (!orig || typeof orig !== 'object') return null;
+    var rec = makeRecord(title, input, options, savedAt, orig.id, orig.order);
+    if (!rec) return null;
+    var same = rec.title === orig.title && rec.input === orig.input &&
+      JSON.stringify(rec.options) === JSON.stringify(normalizeOptions(orig.options));
+    return same ? orig : rec;
+  }
+
   /* convert(input, options) → { siddham, latin, ascii, codepoints }（控制器包 SiddhamConverter；lib 不 import 它）。
    * seq＝在整份清單裡第幾筆；part＝**同一個標題**裡第幾段（標題重複時靠它分段）。
    * ⚠️ 某一筆轉換丟例外：那一筆 `output: null` 並帶 `error`——不整份失敗，也不安靜地少一筆。 */
@@ -336,6 +359,8 @@
     addRecord: addRecord,
     replaceRecord: replaceRecord,
     removeRecord: removeRecord,
+    indexOfId: indexOfId,
+    editRecord: editRecord,
     buildExport: buildExport,
     exportFilename: exportFilename
   };
