@@ -12,7 +12,7 @@
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
 npm run verify                           # 41 條契約檢查
-node scripts/verify.js --selftest        # 192 個反向注入，全部必須被抓到
+node scripts/verify.js --selftest        # 193 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
 python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時的 capabilities 見建置結尾印出的那一行（downloads ＋ db）
 ```
@@ -61,7 +61,8 @@ public/apps/bonji-mobile/
     GitHub／3001 那一份沒有它，照舊存 localStorage（第 ㉟ 條，DESIGN §10.4）。
 16. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
 17. **編輯某一筆（清單上的 ✎）在面板裡做，不經過主畫面**〔owner 2026-10-13〕：`startEdit`／`saveEdit` 不可以碰輸入框、標題欄、畫面上的選項；
-    存回認 `id` 不認序號；編輯中唯一的出口是 儲存／取消（點面板外不關、「完成」收起來）；沒有更動不寫入、記法清空不給存。第 ㊳ 條（DESIGN §10.5）。
+    存回認 `id` 不認序號；編輯中唯一的出口是 儲存／取消（點面板外不關、「完成」收起來）；沒有更動不寫入、記法清空不給存。
+    表單由上到下是 標題 → 類型 → **轉換結果 → 記法** → 出處參考 → 選項〔owner 2026-10-13：「將記法的位置移到轉換結果的下方」；與主畫面同一個方向——輸出在上、輸入在下〕，不要對調回去。第 ㊳ 條（DESIGN §10.5）。
 18. **每一筆有 `type`（類型——**字串陣列，可以有好幾個，像 tags**；第一版是單一字串，讀進來當成一個，**不要寫遷移**）與 `source`（來源，多行；⚠️ **畫面上的標籤是「出處參考」**，欄位名、key、id 仍是 source——不要為了對齊去改名）兩欄，都可以是空的**〔owner 2026-10-13〕：面板上標題欄底下那兩格的值在加入時帶入；編輯表單裡可各自改。
     類型是**自由文字＋複選的快選鈕**（快選鈕只有清單裡用過的類型，lib 的 `typeChoices`；**沒有預設的詞——owner 拿掉了，不要加回來**）——不要改成固定選單；
     欄位裡以「、」相連（`typesText`），面板上那一格與 `state/type` 存的是**欄位裡的字**不是陣列；把陣列塞進欄位要過 `typesText()`（直接塞會變逗號相連）；
