@@ -69,7 +69,7 @@ public/apps/bonji-mobile/
     ⚠️ 新增一個紀錄欄位要動**四個地方**，漏一個都不會報錯：lib 的 `makeRecord`（白名單，沒收就被丟掉）、`buildExport`（JSON 輸出）、
     `artifact/src/remote-db.js` 的**寫入與讀回各一處**、`scripts/backup-artifact.sh` 的 `body()`（沒算進去的話，只改那一欄的狀態不會被另存）。
     兩格的值各自一格存（`bonji-mobile-rec-type`／`state/type`、`bonji-mobile-rec-source`／`state/source`），規矩同第 14 條。舊紀錄沒有這兩欄＝空字串。第 ㊴㊵ 條（DESIGN §10.6、§10.7）。
-19. **清單每一列的三顆鈕是 編輯 → 放大閱讀 → 刪除**〔owner 2026-10-13〕：中間那一顆原本是「取代」，owner 把它換成放大閱讀（那一筆的悉曇以 `font-size: 2em` 顯示），**取代整個拿掉了，不要加回來**。
+19. **清單每一列的三顆鈕是 編輯 → 放大閱讀 → 刪除**〔owner 2026-10-13〕：中間那一顆原本是「取代」，owner 把它換成放大閱讀（那一筆的悉曇以 `font-size: 3em` 顯示——owner 指定的大小，先 2em、同日改 3em），**取代整個拿掉了，不要加回來**。
     放大閱讀那一頁是**唯讀**的——不可以在裡面放任何會寫東西的鈕，三支函式（`startView`／`endView`／`renderView`）不可以碰清單、輸入框或面板上那三格。第 ㊶ 條（DESIGN §10.8）。
 
 ## 複製件登記
