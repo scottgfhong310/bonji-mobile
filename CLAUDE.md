@@ -11,8 +11,8 @@
 
 ```bash
 npm install && npm start                 # → http://localhost:3000/apps/bonji-mobile/
-npm run verify                           # 38 條契約檢查
-node scripts/verify.js --selftest        # 106 個反向注入，全部必須被抓到
+npm run verify                           # 40 條契約檢查
+node scripts/verify.js --selftest        # 162 個反向注入，全部必須被抓到
 python3 scripts/build-cbeta-glyphs.py    # CBETA 字形（上／下接續 ＋ 接續的 6 格）→ cbeta/cbeta-ligatures.svg（⚠️ 不進 GitHub；本機要有 Siddham.ttf）
 python3 artifact/build.py                # Artifacts 版 → artifact/dist/（不進版控；缺 CBETA sprite 會失敗，--no-cbeta 放行）；發佈時的 capabilities 見建置結尾印出的那一行（downloads ＋ db）
 ```
@@ -62,6 +62,12 @@ public/apps/bonji-mobile/
 16. **`downloadText()` 的函式本體是 `artifact/build.py` 的補丁錨點**——改它，那邊的 `DOWNLOAD_OLD` 要一起改（沒改會建置失敗，不會安靜地漏掉）。
 17. **編輯某一筆（清單上的 ✎）在面板裡做，不經過主畫面**〔owner 2026-10-13〕：`startEdit`／`saveEdit` 不可以碰輸入框、標題欄、畫面上的選項；
     存回認 `id` 不認序號；編輯中唯一的出口是 儲存／取消（點面板外不關、「完成」收起來）；沒有更動不寫入、記法清空不給存。第 ㊳ 條（DESIGN §10.5）。
+18. **每一筆有 `type`（類型，單行）與 `source`（來源，多行）兩欄，都可以是空的**〔owner 2026-10-13〕：面板上標題欄底下那兩格的值在加入／取代時帶入；編輯表單裡可各自改。
+    類型是**自由文字＋快選鈕**（預設「真言」「種子字」＋清單裡用過的，lib 的 `typeChoices`）——不要改成固定選單，也不要把預設的詞搬進 locales（那是資料的值）；
+    編輯表單裡那一排快選鈕只動表單那一格，不可以去改面板上的。
+    ⚠️ 新增一個紀錄欄位要動**四個地方**，漏一個都不會報錯：lib 的 `makeRecord`（白名單，沒收就被丟掉）、`buildExport`（JSON 輸出）、
+    `artifact/src/remote-db.js` 的**寫入與讀回各一處**、`scripts/backup-artifact.sh` 的 `body()`（沒算進去的話，只改那一欄的狀態不會被另存）。
+    兩格的值各自一格存（`bonji-mobile-rec-type`／`state/type`、`bonji-mobile-rec-source`／`state/source`），規矩同第 14 條。舊紀錄沒有這兩欄＝空字串。第 ㊴㊵ 條（DESIGN §10.6、§10.7）。
 
 ## 複製件登記
 
